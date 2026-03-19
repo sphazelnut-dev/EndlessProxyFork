@@ -4,7 +4,380 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Endless Proxy</title>
-  <link rel="stylesheet" href="styles.css">
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;500&display=swap');
+ 
+:root {
+  --cyan: #00e5ff;
+  --cyan-dim: #00b8d4;
+  --bg-dark: #020a12;
+  --chrome-bg: #0d1117;
+  --chrome-tab-active: #161d27;
+  --chrome-nav: #111820;
+  --text-main: #e0f7fa;
+  --text-dim: rgba(255,255,255,0.45);
+}
+ 
+* { margin:0; padding:0; box-sizing:border-box; }
+ 
+body {
+  background: var(--bg-dark);
+  font-family: 'Rajdhani', sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text-main);
+  position: relative;
+}
+ 
+#city-canvas {
+  position: fixed;
+  inset: 0; width:100%; height:100%;
+  z-index: 0;
+}
+ 
+/* ══════════════════════════════
+   BROWSER CHROME — DARK THEME
+══════════════════════════════ */
+.browser-chrome {
+  position: relative; z-index: 10;
+  background: var(--chrome-bg);
+  flex-shrink: 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.7);
+  border-bottom: 1px solid rgba(0,229,255,0.08);
+}
+ 
+/* ── Tab bar ── */
+.tab-bar {
+  display: flex;
+  align-items: flex-end;
+  padding: 6px 10px 0 10px;
+  gap: 2px;
+  background: var(--chrome-bg);
+  height: 38px;
+  user-select: none;
+}
+ 
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  height: 30px;
+  background: var(--chrome-tab-active);
+  border-radius: 8px 8px 0 0;
+  font-size: 12px;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 500;
+  color: rgba(255,255,255,0.85);
+  min-width: 160px;
+  max-width: 220px;
+  cursor: default;
+  position: relative;
+  border: 1px solid rgba(0,229,255,0.12);
+  border-bottom: none;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.tab::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--cyan);
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 0 8px var(--cyan);
+}
+.tab-favicon {
+  width: 14px; height: 14px;
+  border-radius: 2px;
+  background: var(--cyan);
+  opacity: 0.8;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.tab-favicon svg { width: 10px; height: 10px; fill: #020a12; }
+ 
+.tab-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ 
+.tab-close {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: rgba(255,255,255,0.4);
+  cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.tab-close:hover { background: rgba(255,255,255,0.12); color: #fff; }
+ 
+.tab-inactive {
+  background: transparent;
+  border-color: transparent;
+  color: rgba(255,255,255,0.45);
+}
+.tab-inactive::after { display: none; }
+.tab-inactive:hover { background: rgba(255,255,255,0.05); }
+ 
+.tab-add {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 18px;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  margin-left: 2px;
+  flex-shrink: 0;
+  align-self: center;
+  margin-bottom: 2px;
+}
+.tab-add:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.8); }
+ 
+/* ── Nav bar ── */
+.nav-bar {
+  display:flex; align-items:center;
+  padding: 5px 12px; gap:8px; height:42px;
+  background: var(--chrome-nav);
+}
+.nav-btn {
+  width:28px; height:28px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:50%; cursor:pointer; flex-shrink:0;
+  transition: background 0.15s;
+}
+.nav-btn:hover { background: rgba(255,255,255,0.08); }
+.nav-btn svg { width:16px; height:16px; fill:rgba(255,255,255,0.55); }
+.nav-btn.disabled { cursor:default; }
+.nav-btn.disabled svg { fill:rgba(255,255,255,0.2); }
+.nav-btn.disabled:hover { background:transparent; }
+ 
+.address-bar {
+  flex:1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius:20px; height:30px;
+  display:flex; align-items:center; padding:0 14px; gap:8px;
+  font-size:13px; color:rgba(255,255,255,0.5); cursor:text;
+  font-family:'Rajdhani',sans-serif; font-weight:500;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.address-bar:hover {
+  border-color: rgba(0,229,255,0.3);
+  box-shadow: 0 0 0 1px rgba(0,229,255,0.1);
+}
+.address-bar svg { width:14px; height:14px; fill:rgba(255,255,255,0.3); flex-shrink:0; }
+.nav-right { display:flex; gap:2px; flex-shrink:0; }
+ 
+/* ── Page ── */
+.page {
+  position:relative; z-index:5; flex:1;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:24px; padding-bottom:40px;
+}
+ 
+/* ── Title ── */
+.proxy-title {
+  font-family:'Orbitron',monospace;
+  font-size:clamp(2rem,5vw,3.2rem);
+  font-weight:900; font-style:italic;
+  color:var(--cyan);
+  text-shadow:0 0 10px var(--cyan),0 0 30px var(--cyan),0 0 70px var(--cyan-dim),0 0 120px rgba(0,229,255,0.25);
+  letter-spacing:4px;
+  animation:flicker 7s infinite;
+  user-select:none; cursor:default;
+  transition: transform 0.2s;
+}
+.proxy-title:hover { transform:scale(1.03); }
+ 
+@keyframes flicker {
+  0%,94%,100%{opacity:1} 95%{opacity:0.8} 96%{opacity:1} 97.5%{opacity:0.65} 98.5%{opacity:1}
+}
+ 
+/* ── Search ── */
+.search-wrap { width:min(720px,85vw); position:relative; }
+ 
+.search-bar-wrap {
+  display:flex; align-items:center; gap:12px;
+  background:rgba(210,225,240,0.18);
+  backdrop-filter:blur(18px) saturate(1.5);
+  -webkit-backdrop-filter:blur(18px) saturate(1.5);
+  border:1px solid rgba(255,255,255,0.28);
+  border-radius:28px; height:48px; padding:0 16px;
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+.search-bar-wrap:focus-within {
+  border-color:rgba(0,229,255,0.6);
+  box-shadow:0 0 28px rgba(0,229,255,0.18);
+}
+.search-icon { width:18px; height:18px; fill:rgba(255,255,255,0.5); flex-shrink:0; }
+ 
+#search-input {
+  flex:1; background:transparent; border:none; outline:none;
+  font-size:15px; color:rgba(255,255,255,0.85);
+  font-family:'Rajdhani',sans-serif; font-weight:500;
+  caret-color:var(--cyan);
+}
+#search-input::placeholder { color:rgba(255,255,255,0.45); }
+ 
+#search-clear {
+  background:none; border:none; cursor:pointer;
+  color:rgba(255,255,255,0.4); font-size:14px;
+  opacity:0; transition:opacity 0.15s, color 0.15s;
+  padding:2px 4px; border-radius:50%;
+}
+#search-clear:hover { color:rgba(255,255,255,0.9); }
+ 
+#suggestions {
+  display:none; position:absolute; top:calc(100% + 6px);
+  width:100%; background:rgba(8,20,35,0.95);
+  backdrop-filter:blur(20px);
+  border:1px solid rgba(0,229,255,0.2);
+  border-radius:14px; overflow:hidden;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);
+  z-index:100;
+}
+.suggestion-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 16px; cursor:pointer;
+  font-size:14px; color:rgba(255,255,255,0.75);
+  transition:background 0.1s;
+}
+.suggestion-item:hover, .suggestion-item:focus {
+  background:rgba(0,229,255,0.1); outline:none; color:#fff;
+}
+ 
+/* ── Shortcuts ── */
+.shortcuts {
+  background:transparent; border:none; box-shadow:none;
+  width:min(900px,90vw); padding:10px 32px;
+  display:flex; align-items:center; justify-content:center;
+  gap:8px; flex-wrap:wrap;
+}
+.shortcut {
+  display:flex; flex-direction:column; align-items:center;
+  gap:10px; cursor:pointer; padding:12px 16px;
+  border-radius:12px; transition:background 0.2s, transform 0.15s;
+  position:relative; overflow:hidden; min-width:80px;
+  user-select:none;
+}
+.shortcut:hover { background:rgba(0,229,255,0.07); transform:translateY(-2px); }
+.shortcut:active { transform:translateY(0) scale(0.97); }
+.shortcut-icon {
+  width:52px; height:52px; border-radius:50%;
+  background:#141420; border:1px solid rgba(255,255,255,0.12);
+  display:flex; align-items:center; justify-content:center;
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+.shortcut:hover .shortcut-icon {
+  border-color:var(--cyan);
+  box-shadow:0 0 14px rgba(0,229,255,0.35);
+}
+.shortcut-label {
+  font-size:12px; font-family:'Rajdhani',sans-serif; font-weight:500;
+  color:var(--text-main); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+  max-width:80px; text-align:center;
+}
+.ripple {
+  position:absolute; border-radius:50%;
+  background:rgba(0,229,255,0.25);
+  transform:scale(0); animation:ripple-anim 0.6s linear;
+  pointer-events:none;
+}
+@keyframes ripple-anim { to { transform:scale(2.5); opacity:0; } }
+.icon-sw {
+  width:30px; height:30px; border-radius:50%; background:#555;
+  display:flex; align-items:center; justify-content:center;
+  color:#fff; font-size:14px; font-weight:bold;
+}
+ 
+/* ── Add shortcut ── */
+#add-shortcut-btn {
+  background:rgba(0,229,255,0.08);
+  border:1px solid rgba(0,229,255,0.3);
+  color:var(--cyan); border-radius:20px;
+  padding:8px 20px; font-size:14px;
+  font-family:'Rajdhani',sans-serif; font-weight:600;
+  cursor:pointer; letter-spacing:1px;
+  transition:background 0.2s, box-shadow 0.2s, transform 0.15s;
+  display:flex; align-items:center; gap:6px;
+}
+#add-shortcut-btn:hover {
+  background:rgba(0,229,255,0.15);
+  box-shadow:0 0 16px rgba(0,229,255,0.2);
+  transform:translateY(-1px);
+}
+#add-shortcut-btn span { font-size:18px; line-height:1; }
+ 
+/* ── Context menu ── */
+#ctx-menu {
+  display:none; position:fixed; z-index:999;
+  background:rgba(8,20,35,0.97);
+  border:1px solid rgba(0,229,255,0.25);
+  border-radius:10px; overflow:hidden;
+  box-shadow:0 8px 30px rgba(0,0,0,0.6);
+  opacity:0; transition:opacity 0.15s; min-width:150px;
+}
+.ctx-item {
+  padding:10px 16px; cursor:pointer; font-size:14px;
+  color:rgba(255,255,255,0.8); transition:background 0.1s, color 0.1s;
+}
+.ctx-item:hover { background:rgba(0,229,255,0.12); color:#fff; }
+ 
+/* ── Modal ── */
+#modal-overlay {
+  display:none; position:fixed; inset:0; z-index:1000;
+  background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center;
+  opacity:0; transition:opacity 0.2s;
+}
+#modal {
+  background:rgba(8,20,38,0.98);
+  border:1px solid rgba(0,229,255,0.3);
+  border-radius:16px; padding:28px 32px;
+  width:min(420px,90vw);
+  box-shadow:0 0 40px rgba(0,229,255,0.15), 0 20px 60px rgba(0,0,0,0.6);
+  display:flex; flex-direction:column; gap:12px;
+}
+#modal-title {
+  font-family:'Orbitron',monospace; font-size:16px;
+  color:var(--cyan); letter-spacing:2px; margin-bottom:4px;
+}
+#modal label { font-size:12px; color:rgba(255,255,255,0.5); letter-spacing:1px; text-transform:uppercase; }
+#modal input {
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.15);
+  border-radius:8px; padding:10px 14px;
+  font-size:14px; color:#fff; outline:none;
+  font-family:'Rajdhani',sans-serif;
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+#modal input:focus { border-color:var(--cyan); box-shadow:0 0 12px rgba(0,229,255,0.15); }
+#modal input::placeholder { color:rgba(255,255,255,0.3); }
+#modal-btns { display:flex; gap:10px; margin-top:6px; justify-content:flex-end; }
+#modal-btns button {
+  padding:9px 22px; border-radius:8px; font-size:14px;
+  font-family:'Rajdhani',sans-serif; font-weight:600;
+  cursor:pointer; border:none; transition:all 0.2s; letter-spacing:1px;
+}
+#modal-cancel { background:rgba(255,255,255,0.07); color:rgba(255,255,255,0.6); }
+#modal-cancel:hover { background:rgba(255,255,255,0.12); color:#fff; }
+#modal-save { background:var(--cyan); color:#020a12; }
+#modal-save:hover { background:#00f5ff; box-shadow:0 0 16px rgba(0,229,255,0.4); }
+ 
+/* ── Toast ── */
+#toast {
+  position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+  background:rgba(0,229,255,0.15); border:1px solid rgba(0,229,255,0.4);
+  color:var(--cyan); padding:10px 22px; border-radius:20px;
+  font-size:14px; font-family:'Rajdhani',sans-serif; font-weight:600;
+  letter-spacing:1px; z-index:9999;
+  opacity:0; pointer-events:none; transition:opacity 0.3s;
+  backdrop-filter:blur(10px);
+}
+#toast.show { opacity:1; }
+  </style>
 </head>
 <body>
  
@@ -12,8 +385,8 @@
  
 <!-- Context menu -->
 <div id="ctx-menu">
-  <div class="ctx-item" id="ctx-edit"> Edit Shortcut</div>
-  <div class="ctx-item" id="ctx-remove"> Remove</div>
+  <div class="ctx-item" id="ctx-edit">✏️ Edit Shortcut</div>
+  <div class="ctx-item" id="ctx-remove">🗑️ Remove</div>
 </div>
  
 <!-- Edit modal -->
@@ -31,11 +404,18 @@
   </div>
 </div>
  
-<!-- Toast notification -->
 <div id="toast"></div>
  
 <!-- Browser chrome -->
 <div class="browser-chrome">
+ 
+  <!-- Tab bar -->
+  <div class="tab-bar" id="tab-bar">
+    <!-- Tabs injected by JS -->
+    <div class="tab-add" id="btn-new-tab" title="New tab">+</div>
+  </div>
+ 
+  <!-- Nav bar -->
   <div class="nav-bar">
     <div class="nav-btn disabled" id="btn-back" title="Go back">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
@@ -46,20 +426,13 @@
     <div class="nav-btn" id="btn-reload" title="Reload page">
       <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
     </div>
-    <div class="tab-add-btn" id="btn-new-tab" title="New tab">+</div>
- 
-    <!-- Clickable address bar that focuses the main search -->
     <div class="address-bar" id="nav-address-bar" title="Click to search">
-      <svg viewBox="0 0 24 24"><path d="M3 5h2V3c-1.1 0-2 .9-2 2zm0 8h2v-2H3v2zm4 8h2v-2H7v2zM3 9h2V7H3v2zm10-6h-2v2h2V3zm6 0v2h2c0-1.1-.9-2-2-2zM5 21v-2H3c0 1.1.9 2 2 2zm-2-4h2v-2H3v2zM9 3H7v2h2V3zm2 18h2v-2h-2v2zm8-8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2zm0-12h2V7h-2v2zm0 8h2v-2h-2v2zm-4 4h2v-2h-2v2zm0-16h2V3h-2v2z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
       <span id="nav-address-text">Search with Google or enter address</span>
     </div>
- 
     <div class="nav-right">
       <div class="nav-btn" id="btn-search-icon" title="Search">
         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-      </div>
-      <div class="nav-btn" id="btn-theme" title="Toggle theme">
-        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 18V4a8 8 0 010 16z"/></svg>
       </div>
       <div class="nav-btn" id="btn-menu" title="More options">
         <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
@@ -72,21 +445,17 @@
 <div class="page">
   <div class="proxy-title" id="proxy-title">Endless Proxy</div>
  
-  <!-- Functional search bar -->
   <div class="search-wrap">
     <div class="search-bar-wrap">
       <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
       <input id="search-input" type="text" placeholder="Search Google or type a URL" autocomplete="off" spellcheck="false">
       <button id="search-clear" title="Clear">✕</button>
     </div>
-    <!-- Search suggestions dropdown -->
     <div id="suggestions"></div>
   </div>
  
-  <!-- Shortcuts -->
   <div class="shortcuts" id="shortcuts-container"></div>
  
-  <!-- Add shortcut button -->
   <button id="add-shortcut-btn" title="Add shortcut">
     <span>+</span> Add shortcut
   </button>
@@ -98,7 +467,6 @@
 // ═══════════════════════════════════════════
 const canvas = document.getElementById('city-canvas');
 const ctx = canvas.getContext('2d');
- 
 function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
 resize();
 window.addEventListener('resize', () => { resize(); initBuildings(); initRain(); });
@@ -109,11 +477,9 @@ function initBuildings() {
   const W = canvas.width, H = canvas.height;
   const count = Math.floor(W / 28);
   for (let i = 0; i < count; i++) {
-    const w = 18 + Math.random() * 40;
-    const h = H * 0.2 + Math.random() * H * 0.55;
+    const w = 18 + Math.random() * 40, h = H * 0.2 + Math.random() * H * 0.55;
     buildings.push({ x: (i/count)*W + Math.random()*12-6, w, h,
-      color: Math.random() > 0.5 ? '#061428' : '#040e1c',
-      windows: genWindows(w, h) });
+      color: Math.random() > 0.5 ? '#061428' : '#040e1c', windows: genWindows(w, h) });
   }
 }
 function genWindows(bw, bh) {
@@ -124,7 +490,6 @@ function genWindows(bw, bh) {
       flicker: Math.random()>0.92 });
   return wins;
 }
- 
 const drops = [];
 function initRain() {
   drops.length = 0;
@@ -134,27 +499,21 @@ function initRain() {
     opacity: 0.15+Math.random()*0.55, angle: 0.08+Math.random()*0.06
   });
 }
- 
 initBuildings(); initRain();
 let frame = 0;
- 
 function draw() {
   frame++;
   const W = canvas.width, H = canvas.height;
   const sky = ctx.createLinearGradient(0,0,0,H);
   sky.addColorStop(0,'#020c18'); sky.addColorStop(0.4,'#041524');
   sky.addColorStop(0.7,'#061e30'); sky.addColorStop(1,'#030d1a');
-  ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
- 
-  const glowY = H*0.38;
-  const g = ctx.createRadialGradient(W*.5,glowY,0,W*.5,glowY,W*.5);
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+  const g = ctx.createRadialGradient(W*.5,H*.38,0,W*.5,H*.38,W*.5);
   g.addColorStop(0,'rgba(0,180,255,0.07)'); g.addColorStop(1,'transparent');
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
- 
   const pg = ctx.createRadialGradient(W*.88,H*.3,0,W*.88,H*.3,W*.25);
   pg.addColorStop(0,'rgba(255,0,120,0.06)'); pg.addColorStop(1,'transparent');
   ctx.fillStyle=pg; ctx.fillRect(0,0,W,H);
- 
   buildings.forEach(b => {
     const baseY=H*.85, bx=b.x, by=baseY-b.h;
     ctx.fillStyle=b.color; ctx.fillRect(bx,by,b.w,b.h);
@@ -169,12 +528,10 @@ function draw() {
     });
     ctx.fillStyle='rgba(0,229,255,0.04)'; ctx.fillRect(bx,by,b.w,2);
   });
- 
   const ground=H*.85;
   const rg=ctx.createLinearGradient(0,ground,0,H);
   rg.addColorStop(0,'rgba(0,229,255,0.12)'); rg.addColorStop(0.3,'rgba(0,100,180,0.08)'); rg.addColorStop(1,'#010810');
   ctx.fillStyle=rg; ctx.fillRect(0,ground,W,H-ground);
- 
   ctx.lineCap='round';
   drops.forEach(d => {
     ctx.beginPath(); ctx.strokeStyle=`rgba(160,220,255,${d.opacity})`; ctx.lineWidth=0.7;
@@ -187,7 +544,93 @@ function draw() {
 draw();
  
 // ═══════════════════════════════════════════
-//  SHORTCUTS DATA & RENDER
+//  TAB MANAGER
+// ═══════════════════════════════════════════
+let tabs = JSON.parse(localStorage.getItem('ep_tabs') || 'null') || [
+  { id: 1, title: 'Endless Proxy', active: true }
+];
+let activeTabId = tabs.find(t=>t.active)?.id || 1;
+let nextTabId = Math.max(...tabs.map(t=>t.id)) + 1;
+ 
+function saveTabs() { localStorage.setItem('ep_tabs', JSON.stringify(tabs)); }
+ 
+const tabBarEl = document.getElementById('tab-bar');
+const addBtn = document.getElementById('btn-new-tab');
+ 
+function renderTabs() {
+  // Remove old tab elements (keep add button)
+  tabBarEl.querySelectorAll('.tab').forEach(el => el.remove());
+ 
+  tabs.forEach(tab => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (tab.id === activeTabId ? '' : ' tab-inactive');
+    el.dataset.id = tab.id;
+    el.innerHTML = `
+      <div class="tab-favicon">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+      </div>
+      <span class="tab-title">${tab.title}</span>
+      <div class="tab-close" data-id="${tab.id}" title="Close tab">✕</div>
+    `;
+    // Click tab to activate
+    el.addEventListener('click', e => {
+      if (e.target.classList.contains('tab-close')) return;
+      switchTab(tab.id);
+    });
+    // Double-click to rename
+    el.querySelector('.tab-title').addEventListener('dblclick', e => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.value = tab.title;
+      input.style.cssText = 'background:transparent;border:none;outline:none;color:rgba(255,255,255,0.85);font-family:Rajdhani,sans-serif;font-size:12px;width:100%;';
+      el.querySelector('.tab-title').replaceWith(input);
+      input.focus(); input.select();
+      const finish = () => {
+        tab.title = input.value.trim() || 'New Tab';
+        saveTabs(); renderTabs();
+      };
+      input.addEventListener('blur', finish);
+      input.addEventListener('keydown', e => { if(e.key==='Enter') input.blur(); if(e.key==='Escape'){input.value=tab.title;input.blur();} });
+    });
+    // Close button
+    el.querySelector('.tab-close').addEventListener('click', e => {
+      e.stopPropagation();
+      closeTab(tab.id);
+    });
+    tabBarEl.insertBefore(el, addBtn);
+  });
+}
+ 
+function switchTab(id) {
+  tabs.forEach(t => t.active = t.id === id);
+  activeTabId = id;
+  saveTabs(); renderTabs();
+  showToast(`Switched to: ${tabs.find(t=>t.id===id)?.title}`);
+}
+ 
+function closeTab(id) {
+  if (tabs.length === 1) { showToast("Can't close last tab"); return; }
+  const idx = tabs.findIndex(t=>t.id===id);
+  tabs = tabs.filter(t=>t.id!==id);
+  if (activeTabId === id) {
+    const next = tabs[Math.min(idx, tabs.length-1)];
+    tabs.forEach(t => t.active = t.id===next.id);
+    activeTabId = next.id;
+  }
+  saveTabs(); renderTabs();
+}
+ 
+addBtn.addEventListener('click', () => {
+  const newTab = { id: nextTabId++, title: 'New Tab', active: false };
+  tabs.push(newTab);
+  saveTabs();
+  switchTab(newTab.id);
+});
+ 
+renderTabs();
+ 
+// ═══════════════════════════════════════════
+//  SHORTCUTS
 // ═══════════════════════════════════════════
 const DEFAULT_SHORTCUTS = [
   { id:1, label:'Downloads', url:'chrome://downloads', icon:'S', type:'letter' },
@@ -196,24 +639,15 @@ const DEFAULT_SHORTCUTS = [
   { id:4, label:'Google', url:'https://www.google.com', type:'google' },
   { id:5, label:'Bing Search', url:'https://www.bing.com', type:'bing' }
 ];
- 
 let shortcuts = JSON.parse(localStorage.getItem('ep_shortcuts') || 'null') || DEFAULT_SHORTCUTS;
 let nextId = Math.max(...shortcuts.map(s=>s.id)) + 1;
- 
 function saveShortcuts() { localStorage.setItem('ep_shortcuts', JSON.stringify(shortcuts)); }
  
 function googleGSVG() {
-  return `<svg viewBox="0 0 48 48" width="28" height="28">
-    <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/>
-    <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.32-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/>
-    <path fill="#FBBC05" d="M11.68 28.18A13.97 13.97 0 0110.9 24c0-1.45.25-2.86.78-4.18v-5.7H4.34A23.93 23.93 0 002 24c0 3.86.92 7.51 2.34 10.88l7.34-6.7z"/>
-    <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 13.12l7.34 5.7c1.74-5.2 6.59-9.07 12.32-9.07z"/>
-  </svg>`;
+  return `<svg viewBox="0 0 48 48" width="28" height="28"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.32-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.68 28.18A13.97 13.97 0 0110.9 24c0-1.45.25-2.86.78-4.18v-5.7H4.34A23.93 23.93 0 002 24c0 3.86.92 7.51 2.34 10.88l7.34-6.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 13.12l7.34 5.7c1.74-5.2 6.59-9.07 12.32-9.07z"/></svg>`;
 }
 function bingSVG() {
-  return `<svg viewBox="0 0 24 24" width="26" height="26">
-    <path fill="#3b9ce5" d="M5 3l4 1.5v12.3l4.3-2.5-1.8-1.1 2.8-5.9L20 9.8 12.8 21 5 17.3z"/>
-  </svg>`;
+  return `<svg viewBox="0 0 24 24" width="26" height="26"><path fill="#3b9ce5" d="M5 3l4 1.5v12.3l4.3-2.5-1.8-1.1 2.8-5.9L20 9.8 12.8 21 5 17.3z"/></svg>`;
 }
 function faviconIcon(url) {
   try {
@@ -221,15 +655,13 @@ function faviconIcon(url) {
     return `<img src="https://www.google.com/s2/favicons?sz=32&domain=${domain}" width="28" height="28" onerror="this.outerHTML='<span style=font-size:18px>🌐</span>'">`;
   } catch { return `<span style="font-size:18px">🌐</span>`; }
 }
- 
 function shortcutIconHTML(s) {
-  if (s.type === 'google') return googleGSVG();
-  if (s.type === 'bing') return bingSVG();
-  if (s.type === 'letter') return `<div class="icon-sw">${s.icon||'?'}</div>`;
-  if (s.type === 'favicon') return faviconIcon(s.url);
+  if (s.type==='google') return googleGSVG();
+  if (s.type==='bing') return bingSVG();
+  if (s.type==='letter') return `<div class="icon-sw">${s.icon||'?'}</div>`;
+  if (s.type==='favicon') return faviconIcon(s.url);
   return `<span style="font-size:18px">🌐</span>`;
 }
- 
 function renderShortcuts() {
   const container = document.getElementById('shortcuts-container');
   container.innerHTML = '';
@@ -237,10 +669,7 @@ function renderShortcuts() {
     const el = document.createElement('div');
     el.className = 'shortcut';
     el.dataset.id = s.id;
-    el.innerHTML = `
-      <div class="shortcut-icon">${shortcutIconHTML(s)}</div>
-      <span class="shortcut-label">${s.label}</span>
-    `;
+    el.innerHTML = `<div class="shortcut-icon">${shortcutIconHTML(s)}</div><span class="shortcut-label">${s.label}</span>`;
     el.addEventListener('click', e => { if (!e.defaultPrevented) navigateTo(s.url); });
     el.addEventListener('contextmenu', e => showCtxMenu(e, s.id));
     container.appendChild(el);
@@ -252,15 +681,10 @@ renderShortcuts();
 function navigateTo(url) {
   let target = url.trim();
   if (!target) return;
-  if (!target.startsWith('http') && !target.startsWith('chrome://') && !target.includes('://')) {
-    target = 'https://' + target;
-  }
+  if (!target.startsWith('http') && !target.startsWith('chrome://') && !target.includes('://')) target = 'https://' + target;
   window.location.href = target;
 }
  
-// ═══════════════════════════════════════════
-//  RIPPLE EFFECT
-// ═══════════════════════════════════════════
 function rippleSetup(el) {
   el.addEventListener('mousedown', e => {
     const r = document.createElement('span');
@@ -274,21 +698,20 @@ function rippleSetup(el) {
 }
  
 // ═══════════════════════════════════════════
-//  SEARCH BAR
+//  SEARCH
 // ═══════════════════════════════════════════
 const searchInput = document.getElementById('search-input');
 const searchClear = document.getElementById('search-clear');
 const suggestionsEl = document.getElementById('suggestions');
 const navAddressText = document.getElementById('nav-address-text');
-const navAddressBar = document.getElementById('nav-address-bar');
  
 const quickSuggestions = [
-  { text: 'google.com', url: 'https://google.com' },
-  { text: 'youtube.com', url: 'https://youtube.com' },
-  { text: 'github.com', url: 'https://github.com' },
-  { text: 'reddit.com', url: 'https://reddit.com' },
-  { text: 'twitter.com', url: 'https://twitter.com' },
-  { text: 'wikipedia.org', url: 'https://wikipedia.org' },
+  { text:'google.com', url:'https://google.com' },
+  { text:'youtube.com', url:'https://youtube.com' },
+  { text:'github.com', url:'https://github.com' },
+  { text:'reddit.com', url:'https://reddit.com' },
+  { text:'twitter.com', url:'https://twitter.com' },
+  { text:'wikipedia.org', url:'https://wikipedia.org' },
 ];
  
 searchInput.addEventListener('input', () => {
@@ -297,176 +720,132 @@ searchInput.addEventListener('input', () => {
   navAddressText.textContent = val || 'Search with Google or enter address';
   showSuggestions(val);
 });
- 
 searchInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    const val = searchInput.value.trim();
-    if (!val) return;
+  if (e.key==='Enter') {
+    const val = searchInput.value.trim(); if (!val) return;
     hideSuggestions();
-    // Check if it looks like a URL
-    if (val.includes('.') && !val.includes(' ')) {
-      navigateTo(val);
-    } else {
-      window.location.href = `https://www.google.com/search?q=${encodeURIComponent(val)}`;
-    }
+    if (val.includes('.') && !val.includes(' ')) navigateTo(val);
+    else window.location.href = `https://www.google.com/search?q=${encodeURIComponent(val)}`;
   }
-  if (e.key === 'Escape') { hideSuggestions(); searchInput.blur(); }
-  if (e.key === 'ArrowDown') {
-    const items = suggestionsEl.querySelectorAll('.suggestion-item');
-    if (items.length) { items[0].focus(); e.preventDefault(); }
-  }
+  if (e.key==='Escape') { hideSuggestions(); searchInput.blur(); }
+  if (e.key==='ArrowDown') { const items=suggestionsEl.querySelectorAll('.suggestion-item'); if(items.length){items[0].focus();e.preventDefault();} }
 });
- 
 searchClear.addEventListener('click', () => {
-  searchInput.value = '';
-  searchClear.style.opacity = '0';
-  navAddressText.textContent = 'Search with Google or enter address';
-  hideSuggestions();
-  searchInput.focus();
+  searchInput.value=''; searchClear.style.opacity='0';
+  navAddressText.textContent='Search with Google or enter address';
+  hideSuggestions(); searchInput.focus();
 });
- 
-navAddressBar.addEventListener('click', () => searchInput.focus());
+document.getElementById('nav-address-bar').addEventListener('click', () => searchInput.focus());
 document.getElementById('btn-search-icon').addEventListener('click', () => searchInput.focus());
  
 function showSuggestions(val) {
   if (!val) { hideSuggestions(); return; }
-  const filtered = quickSuggestions.filter(s => s.text.includes(val.toLowerCase()));
-  const searchSugg = { text: `Search Google for "${val}"`, url: `https://www.google.com/search?q=${encodeURIComponent(val)}`, isSearch: true };
-  const all = [searchSugg, ...filtered].slice(0, 6);
- 
-  suggestionsEl.innerHTML = all.map((s, i) => `
+  const filtered = quickSuggestions.filter(s=>s.text.includes(val.toLowerCase()));
+  const searchSugg = { text:`Search Google for "${val}"`, url:`https://www.google.com/search?q=${encodeURIComponent(val)}`, isSearch:true };
+  const all = [searchSugg, ...filtered].slice(0,6);
+  suggestionsEl.innerHTML = all.map(s=>`
     <div class="suggestion-item" tabindex="0" data-url="${s.url}">
       ${s.isSearch
         ? `<svg viewBox="0 0 24 24" width="14" height="14" fill="rgba(255,255,255,0.4)"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>`
         : `<svg viewBox="0 0 24 24" width="14" height="14" fill="rgba(255,255,255,0.4)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>`}
       <span>${s.text}</span>
-    </div>
-  `).join('');
-  suggestionsEl.style.display = 'block';
- 
+    </div>`).join('');
+  suggestionsEl.style.display='block';
   suggestionsEl.querySelectorAll('.suggestion-item').forEach(item => {
     item.addEventListener('click', () => navigateTo(item.dataset.url));
     item.addEventListener('keydown', e => {
-      if (e.key === 'Enter') navigateTo(item.dataset.url);
-      if (e.key === 'ArrowDown' && item.nextSibling) item.nextSibling.focus();
-      if (e.key === 'ArrowUp') { const p = item.previousSibling; p ? p.focus() : searchInput.focus(); }
+      if(e.key==='Enter') navigateTo(item.dataset.url);
+      if(e.key==='ArrowDown'&&item.nextSibling) item.nextSibling.focus();
+      if(e.key==='ArrowUp'){const p=item.previousSibling; p?p.focus():searchInput.focus();}
     });
   });
 }
- 
-function hideSuggestions() { suggestionsEl.style.display = 'none'; }
-document.addEventListener('click', e => { if (!e.target.closest('.search-wrap')) hideSuggestions(); });
+function hideSuggestions() { suggestionsEl.style.display='none'; }
+document.addEventListener('click', e => { if(!e.target.closest('.search-wrap')) hideSuggestions(); });
  
 // ═══════════════════════════════════════════
 //  CONTEXT MENU
 // ═══════════════════════════════════════════
 const ctxMenu = document.getElementById('ctx-menu');
 let ctxTargetId = null;
- 
 function showCtxMenu(e, id) {
-  e.preventDefault();
-  ctxTargetId = id;
-  ctxMenu.style.left = Math.min(e.clientX, innerWidth-160) + 'px';
-  ctxMenu.style.top = Math.min(e.clientY, innerHeight-80) + 'px';
-  ctxMenu.style.display = 'block';
-  requestAnimationFrame(() => ctxMenu.style.opacity = '1');
+  e.preventDefault(); ctxTargetId=id;
+  ctxMenu.style.left=Math.min(e.clientX,innerWidth-160)+'px';
+  ctxMenu.style.top=Math.min(e.clientY,innerHeight-80)+'px';
+  ctxMenu.style.display='block';
+  requestAnimationFrame(()=>ctxMenu.style.opacity='1');
 }
 function hideCtxMenu() { ctxMenu.style.opacity='0'; setTimeout(()=>ctxMenu.style.display='none',150); }
 document.addEventListener('click', hideCtxMenu);
- 
-document.getElementById('ctx-edit').addEventListener('click', () => {
-  const s = shortcuts.find(x=>x.id===ctxTargetId);
-  if (s) openModal(s);
-});
+document.getElementById('ctx-edit').addEventListener('click', () => { const s=shortcuts.find(x=>x.id===ctxTargetId); if(s) openModal(s); });
 document.getElementById('ctx-remove').addEventListener('click', () => {
-  shortcuts = shortcuts.filter(x=>x.id!==ctxTargetId);
-  saveShortcuts(); renderShortcuts();
-  showToast('Shortcut removed');
+  shortcuts=shortcuts.filter(x=>x.id!==ctxTargetId);
+  saveShortcuts(); renderShortcuts(); showToast('Shortcut removed');
 });
  
 // ═══════════════════════════════════════════
-//  MODAL (add/edit shortcut)
+//  MODAL
 // ═══════════════════════════════════════════
 const modalOverlay = document.getElementById('modal-overlay');
 const modalName = document.getElementById('modal-name');
 const modalUrl = document.getElementById('modal-url');
 let editingId = null;
- 
 function openModal(s) {
-  editingId = s ? s.id : null;
-  document.getElementById('modal-title').textContent = s ? 'Edit Shortcut' : 'Add Shortcut';
-  modalName.value = s ? s.label : '';
-  modalUrl.value = s ? s.url : '';
-  modalOverlay.style.display = 'flex';
-  requestAnimationFrame(() => modalOverlay.style.opacity = '1');
+  editingId=s?s.id:null;
+  document.getElementById('modal-title').textContent=s?'Edit Shortcut':'Add Shortcut';
+  modalName.value=s?s.label:''; modalUrl.value=s?s.url:'';
+  modalOverlay.style.display='flex';
+  requestAnimationFrame(()=>modalOverlay.style.opacity='1');
   modalName.focus();
 }
-function closeModal() {
-  modalOverlay.style.opacity = '0';
-  setTimeout(() => modalOverlay.style.display='none', 200);
-}
- 
+function closeModal() { modalOverlay.style.opacity='0'; setTimeout(()=>modalOverlay.style.display='none',200); }
 document.getElementById('modal-cancel').addEventListener('click', closeModal);
-modalOverlay.addEventListener('click', e => { if (e.target===modalOverlay) closeModal(); });
- 
+modalOverlay.addEventListener('click', e=>{if(e.target===modalOverlay) closeModal();});
 document.getElementById('modal-save').addEventListener('click', () => {
-  const name = modalName.value.trim();
-  const url = modalUrl.value.trim();
-  if (!name || !url) { showToast('Please fill in both fields'); return; }
- 
-  if (editingId) {
-    const s = shortcuts.find(x=>x.id===editingId);
-    if (s) { s.label=name; s.url=url; s.type='favicon'; }
-  } else {
-    shortcuts.push({ id: nextId++, label:name, url, type:'favicon' });
-  }
-  saveShortcuts(); renderShortcuts(); closeModal();
-  showToast(editingId ? 'Shortcut updated!' : 'Shortcut added!');
+  const name=modalName.value.trim(), url=modalUrl.value.trim();
+  if(!name||!url){showToast('Please fill in both fields');return;}
+  if(editingId){const s=shortcuts.find(x=>x.id===editingId);if(s){s.label=name;s.url=url;s.type='favicon';}}
+  else shortcuts.push({id:nextId++,label:name,url,type:'favicon'});
+  saveShortcuts();renderShortcuts();closeModal();
+  showToast(editingId?'Shortcut updated!':'Shortcut added!');
 });
- 
-[modalName, modalUrl].forEach(inp => inp.addEventListener('keydown', e => {
-  if (e.key==='Enter') document.getElementById('modal-save').click();
-  if (e.key==='Escape') closeModal();
+[modalName,modalUrl].forEach(inp=>inp.addEventListener('keydown',e=>{
+  if(e.key==='Enter') document.getElementById('modal-save').click();
+  if(e.key==='Escape') closeModal();
 }));
- 
-document.getElementById('add-shortcut-btn').addEventListener('click', () => openModal(null));
+document.getElementById('add-shortcut-btn').addEventListener('click', ()=>openModal(null));
  
 // ═══════════════════════════════════════════
 //  NAV BUTTONS
 // ═══════════════════════════════════════════
 document.getElementById('btn-reload').addEventListener('click', () => {
-  const btn = document.getElementById('btn-reload');
-  btn.style.transform = 'rotate(360deg)';
-  btn.style.transition = 'transform 0.5s ease';
-  setTimeout(() => { btn.style.transform=''; btn.style.transition=''; location.reload(); }, 500);
+  const btn=document.getElementById('btn-reload');
+  btn.style.transform='rotate(360deg)'; btn.style.transition='transform 0.5s ease';
+  setTimeout(()=>{btn.style.transform='';btn.style.transition='';location.reload();},500);
 });
-document.getElementById('btn-new-tab').addEventListener('click', () => window.open('about:blank','_blank'));
-document.getElementById('btn-back').addEventListener('click', () => history.back());
-document.getElementById('btn-forward').addEventListener('click', () => history.forward());
+document.getElementById('btn-back').addEventListener('click', ()=>history.back());
+document.getElementById('btn-forward').addEventListener('click', ()=>history.forward());
  
 // ═══════════════════════════════════════════
 //  TOAST
 // ═══════════════════════════════════════════
 let toastTimer;
 function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'show';
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='show';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.className='', 2500);
+  toastTimer=setTimeout(()=>t.className='',2500);
 }
  
 // ═══════════════════════════════════════════
-//  TITLE CLICK → RESET
+//  TITLE DOUBLE-CLICK → RESET
 // ═══════════════════════════════════════════
-document.getElementById('proxy-title').addEventListener('dblclick', () => {
-  if (confirm('Reset all shortcuts to default?')) {
-    shortcuts = JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS));
-    saveShortcuts(); renderShortcuts();
-    showToast('Shortcuts reset to default');
+document.getElementById('proxy-title').addEventListener('dblclick', ()=>{
+  if(confirm('Reset all shortcuts to default?')){
+    shortcuts=JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS));
+    saveShortcuts();renderShortcuts();showToast('Shortcuts reset to default');
   }
 });
 </script>
 </body>
 </html>
- 
