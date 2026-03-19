@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Tab</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+ 
+<!-- Animated cityscape canvas -->
+<canvas id="city-canvas"></canvas>
+ 
+<!-- Browser chrome (light nav bar) -->
+<div class="browser-chrome">
+  <div class="nav-bar">
+ 
+    <!-- Back (disabled) -->
+    <div class="nav-btn disabled">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </div>
+ 
+    <!-- Forward -->
+    <div class="nav-btn">
+      <svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+    </div>
+ 
+    <!-- Reload -->
+    <div class="nav-btn">
+      <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+    </div>
+ 
+    <!-- Tab add -->
+    <div class="tab-add-btn">+</div>
+ 
+    <!-- Address bar -->
+    <div class="address-bar">
+      <svg viewBox="0 0 24 24"><path d="M3 5h2V3c-1.1 0-2 .9-2 2zm0 8h2v-2H3v2zm4 8h2v-2H7v2zM3 9h2V7H3v2zm10-6h-2v2h2V3zm6 0v2h2c0-1.1-.9-2-2-2zM5 21v-2H3c0 1.1.9 2 2 2zm-2-4h2v-2H3v2zM9 3H7v2h2V3zm2 18h2v-2h-2v2zm8-8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2zm0-12h2V7h-2v2zm0 8h2v-2h-2v2zm-4 4h2v-2h-2v2zm0-16h2V3h-2v2z"/></svg>
+      Search with Google or enter address
+    </div>
+ 
+    <!-- Right icons -->
+    <div class="nav-right">
+      <div class="nav-btn">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      </div>
+      <div class="nav-btn">
+        <svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 100 10A5 5 0 0012 2zm0 2a3 3 0 110 6 3 3 0 010-6zm0 11c-5.33 0-8 2.67-8 4v1h16v-1c0-1.33-2.67-4-8-4z"/></svg>
+      </div>
+      <div class="nav-btn">
+        <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+      </div>
+    </div>
+ 
+  </div>
+</div>
+ 
+<!-- Page content -->
+<div class="page">
+ 
+  <!-- Glowing title -->
+  <div class="proxy-title">Endless Proxy</div>
+ 
+  <!-- Search bar -->
+  <div class="search-wrap">
+    <div class="search-bar">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      Search Google or type a URL
+    </div>
+  </div>
+ 
+  <!-- Shortcuts panel -->
+  <div class="shortcuts">
+ 
+    <div class="shortcut">
+      <div class="shortcut-icon"><div class="icon-sw">S</div></div>
+      <span class="shortcut-label">Downloads</span>
+    </div>
+ 
+    <div class="shortcut">
+      <div class="shortcut-icon"><div class="icon-sw">S</div></div>
+      <span class="shortcut-label">Downloads</span>
+    </div>
+ 
+    <div class="shortcut">
+      <div class="shortcut-icon">
+        <svg class="google-g" viewBox="0 0 48 48">
+          <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/>
+          <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.32-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/>
+          <path fill="#FBBC05" d="M11.68 28.18A13.97 13.97 0 0110.9 24c0-1.45.25-2.86.78-4.18v-5.7H4.34A23.93 23.93 0 002 24c0 3.86.92 7.51 2.34 10.88l7.34-6.7z"/>
+          <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 13.12l7.34 5.7c1.74-5.2 6.59-9.07 12.32-9.07z"/>
+        </svg>
+      </div>
+      <span class="shortcut-label">Google Sea...</span>
+    </div>
+ 
+    <div class="shortcut">
+      <div class="shortcut-icon">
+        <svg class="google-g" viewBox="0 0 48 48">
+          <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/>
+          <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.32-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/>
+          <path fill="#FBBC05" d="M11.68 28.18A13.97 13.97 0 0110.9 24c0-1.45.25-2.86.78-4.18v-5.7H4.34A23.93 23.93 0 002 24c0 3.86.92 7.51 2.34 10.88l7.34-6.7z"/>
+          <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 13.12l7.34 5.7c1.74-5.2 6.59-9.07 12.32-9.07z"/>
+        </svg>
+      </div>
+      <span class="shortcut-label">https//ww...</span>
+    </div>
+ 
+    <div class="shortcut">
+      <div class="shortcut-icon">
+        <svg class="bing-icon" viewBox="0 0 24 24">
+          <path fill="#3b9ce5" d="M5 3l4 1.5v12.3l4.3-2.5-1.8-1.1 2.8-5.9L20 9.8 12.8 21 5 17.3z"/>
+        </svg>
+      </div>
+      <span class="shortcut-label">Search - Mi...</span>
+    </div>
+ 
+  </div>
+</div>
+ 
+<script>
+// ── Animated cyberpunk cityscape ──
+const canvas = document.getElementById('city-canvas');
+const ctx = canvas.getContext('2d');
+ 
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+ 
+// Building definitions
+const buildings = [];
+function initBuildings() {
+  buildings.length = 0;
+  const W = canvas.width, H = canvas.height;
+  const count = Math.floor(W / 28);
+  for (let i = 0; i < count; i++) {
+    const w = 18 + Math.random() * 40;
+    const h = H * 0.2 + Math.random() * H * 0.55;
+    buildings.push({
+      x: (i / count) * W + Math.random() * 12 - 6,
+      w, h,
+      color: Math.random() > 0.5 ? '#061428' : '#040e1c',
+      windows: generateWindows(w, h)
+    });
+  }
+}
+ 
+function generateWindows(bw, bh) {
+  const wins = [];
+  const cols = Math.floor(bw / 7);
+  const rows = Math.floor(bh / 10);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      wins.push({
+        col: c, row: r,
+        lit: Math.random() > 0.45,
+        color: Math.random() > 0.6 ? '#00e5ff' : (Math.random() > 0.5 ? '#80d8ff' : '#0288d1'),
+        flicker: Math.random() > 0.92
+      });
+    }
+  }
+  return wins;
+}
+ 
+// Rain drops
+const drops = [];
+function initRain() {
+  drops.length = 0;
+  const count = 350;
+  for (let i = 0; i < count; i++) {
+    drops.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      len: 8 + Math.random() * 22,
+      speed: 12 + Math.random() * 22,
+      opacity: 0.15 + Math.random() * 0.55,
+      angle: 0.08 + Math.random() * 0.06
+    });
+  }
+}
+ 
+initBuildings();
+initRain();
+window.addEventListener('resize', () => { initBuildings(); initRain(); });
+ 
+let frame = 0;
+ 
+function draw() {
+  frame++;
+  const W = canvas.width, H = canvas.height;
+ 
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#020c18');
+  sky.addColorStop(0.4, '#041524');
+  sky.addColorStop(0.7, '#061e30');
+  sky.addColorStop(1, '#030d1a');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+ 
+  // Distant glow bands
+  const glowY = H * 0.38;
+  const glow = ctx.createRadialGradient(W * 0.5, glowY, 0, W * 0.5, glowY, W * 0.5);
+  glow.addColorStop(0, 'rgba(0,180,255,0.07)');
+  glow.addColorStop(1, 'transparent');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+ 
+  // Pink accent glow right
+  const pinkGlow = ctx.createRadialGradient(W * 0.88, H * 0.3, 0, W * 0.88, H * 0.3, W * 0.25);
+  pinkGlow.addColorStop(0, 'rgba(255,0,120,0.06)');
+  pinkGlow.addColorStop(1, 'transparent');
+  ctx.fillStyle = pinkGlow;
+  ctx.fillRect(0, 0, W, H);
+ 
+  // Draw buildings
+  buildings.forEach(b => {
+    const baseY = H * 0.85;
+    const bx = b.x, by = baseY - b.h;
+ 
+    ctx.fillStyle = b.color;
+    ctx.fillRect(bx, by, b.w, b.h);
+ 
+    // Subtle neon edge
+    ctx.strokeStyle = 'rgba(0,200,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, b.w, b.h);
+ 
+    // Windows
+    b.windows.forEach(win => {
+      if (!win.lit) return;
+      const flickering = win.flicker && (frame % 90 < 3 || (frame % 150 > 145));
+      if (flickering) return;
+      const wx = bx + 3 + win.col * 7;
+      const wy = by + 5 + win.row * 10;
+      ctx.fillStyle = win.color;
+      ctx.globalAlpha = 0.55 + 0.3 * Math.sin(frame * 0.02 + win.col);
+      ctx.fillRect(wx, wy, 4, 5);
+      ctx.globalAlpha = 1;
+    });
+ 
+    // Rooftop glow
+    ctx.fillStyle = 'rgba(0,229,255,0.04)';
+    ctx.fillRect(bx, by, b.w, 2);
+  });
+ 
+  // Ground reflection band
+  const ground = H * 0.85;
+  const refGrad = ctx.createLinearGradient(0, ground, 0, H);
+  refGrad.addColorStop(0, 'rgba(0,229,255,0.12)');
+  refGrad.addColorStop(0.3, 'rgba(0,100,180,0.08)');
+  refGrad.addColorStop(1, '#010810');
+  ctx.fillStyle = refGrad;
+  ctx.fillRect(0, ground, W, H - ground);
+ 
+  // Rain
+  ctx.lineCap = 'round';
+  drops.forEach(d => {
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(160,220,255,${d.opacity})`;
+    ctx.lineWidth = 0.7;
+    ctx.moveTo(d.x, d.y);
+    ctx.lineTo(d.x + d.len * Math.sin(d.angle), d.y + d.len);
+    ctx.stroke();
+ 
+    d.y += d.speed;
+    d.x += d.speed * Math.sin(d.angle);
+    if (d.y > H) {
+      d.y = -d.len;
+      d.x = Math.random() * W;
+    }
+  });
+ 
+  requestAnimationFrame(draw);
+}
+ 
+draw();
+</script>
+ 
+</body>
+</html>
+ 
