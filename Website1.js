@@ -4,7 +4,7 @@
 const canvas = document.getElementById('city-canvas');
 const ctx = canvas.getContext('2d');
 function resize(){ canvas.width=innerWidth; canvas.height=innerHeight; }
-resize(); window.addEventListener('resize',()=>{resize();initBuildings();initRain();initBirds();initSnow();initLeaves();initSpring();initSand();initRadioactive();if(typeof splitActive!=='undefined'&&splitActive)applySplitRatio();});
+resize(); window.addEventListener('resize',()=>{resize();initBuildings();initRain();initBirds();initSnow();initLeaves();initSpring();initSand();initRadioactive();initThunder();initGrass();if(typeof splitActive!=='undefined'&&splitActive)applySplitRatio();});
 const buildings=[];
 function initBuildings(){
   buildings.length=0; const W=canvas.width,H=canvas.height,count=Math.floor(W/28);
@@ -14,6 +14,8 @@ function initBuildings(){
   const springPalette=[['#c8d8a0','#b0c888'],['#b8d090','#a0b878'],['#d0e0a8','#b8c890'],['#aac888','#92b070'],['#c0d898','#a8c080'],['#b0cc8c','#98b474']];
   const sandPalette=[['#4a3010','#3a2408'],['#3e2a0c','#2e1e06'],['#52360e','#402808'],['#442e0c','#342208'],['#4e3212','#3c2608'],['#3a2808','#2c1e06']];
   const radioPalette=[['#081808','#040e04'],['#0a1e0a','#061006'],['#0c2008','#080e04'],['#0e1e0e','#060c06'],['#081c08','#041004'],['#0a1a0a','#050c05']];
+  const thunderPalette=[['#1a2035','#121828'],['#182030','#101625'],['#1c2540','#141c30'],['#14182c','#0e1220'],['#202840','#182035'],['#1e2438','#161c2c']];
+  const grassPalette=[['#0e2010','#081408'],['#122614','#0a180a'],['#0c1e0e','#061206'],['#142812','#0c1c0a'],['#102210','#081608'],['#162a12','#0e1c0c']];
   for(let i=0;i<count;i++){const w=18+Math.random()*40,h=H*.2+Math.random()*H*.55;
     const sp=summerPalette[Math.floor(Math.random()*summerPalette.length)];
     const wp=winterPalette[Math.floor(Math.random()*winterPalette.length)];
@@ -21,6 +23,8 @@ function initBuildings(){
     const spp=springPalette[Math.floor(Math.random()*springPalette.length)];
     const sdp=sandPalette[Math.floor(Math.random()*sandPalette.length)];
     const rdp=radioPalette[Math.floor(Math.random()*radioPalette.length)];
+    const tdp=thunderPalette[Math.floor(Math.random()*thunderPalette.length)];
+    const gdp=grassPalette[Math.floor(Math.random()*grassPalette.length)];
     buildings.push({x:(i/count)*W+Math.random()*12-6,w,h,
       color:Math.random()>.5?'#061428':'#040e1c',
       summerColor:sp[0], summerColorB:sp[1],
@@ -29,11 +33,52 @@ function initBuildings(){
       springColor:spp[0], springColorB:spp[1],
       sandColor:sdp[0], sandColorB:sdp[1],
       radioColor:rdp[0], radioColorB:rdp[1],
-      windows:genWins(w,h)});}
+      thunderColor:tdp[0], thunderColorB:tdp[1],
+      grassColor:gdp[0], grassColorB:gdp[1],
+      windows:genWins(w,h,i)});}
 }
-function genWins(bw,bh){const wins=[],cols=Math.floor(bw/7),rows=Math.floor(bh/10);
-  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)wins.push({col:c,row:r,lit:Math.random()>.45,
-    color:Math.random()>.6?'#00e5ff':Math.random()>.5?'#80d8ff':'#0288d1',flicker:Math.random()>.92});return wins;}
+// ── Window rendering ──
+// windowAnimations=false skips the array entirely; window colour/lit is derived
+// from a fast integer hash of (buildingIndex, col, row) so no storage needed.
+let windowAnimations = localStorage.getItem('ep_winanim') !== '0';
+
+function hashInt(a, b, c) {
+  // Fast 32-bit hash — returns 0..1 float
+  let h = (a * 2246822519 ^ b * 2654435761 ^ c * 1597334677) >>> 0;
+  h ^= h >>> 16; h = Math.imul(h, 0x45d9f3b); h ^= h >>> 16;
+  return (h >>> 0) / 0xffffffff;
+}
+
+function genWins(bw, bh, bi) {
+  if (!windowAnimations) return [];
+  const wins = [], cols = Math.floor(bw/7), rows = Math.floor(bh/10);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const h = hashInt(bi, c, r);
+    wins.push({
+      col: c, row: r,
+      lit: h > 0.45,
+      color: h > 0.6 ? '#00e5ff' : h > 0.5 ? '#80d8ff' : '#0288d1',
+      flicker: h > 0.92
+    });
+  }
+  return wins;
+}
+
+// Draw windows without array — derives everything from hash
+function drawWindowsDirect(bx, by, bw, bh, bi, winColor1, winColor2, winColor3, baseAlpha) {
+  // Performance mode: static windows, no per-frame math, no flicker
+  const cols = Math.floor(bw/7), rows = Math.floor(bh/10);
+  ctx.globalAlpha = baseAlpha;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const h = hashInt(bi, c, r);
+      if (h <= 0.45) continue; // unlit
+      ctx.fillStyle = h > 0.6 ? winColor1 : h > 0.5 ? winColor2 : winColor3;
+      ctx.fillRect(bx + 3 + c*7, by + 5 + r*10, 4, 5);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
 const drops=[];
 function initRain(){drops.length=0;for(let i=0;i<350;i++)drops.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,len:8+Math.random()*22,speed:12+Math.random()*22,opacity:.15+Math.random()*.55,angle:.08+Math.random()*.06});}
 initBuildings();initRain();let frame=0;
@@ -44,6 +89,8 @@ let fallEnabled=localStorage.getItem('ep_fall')==='1';
 let springEnabled=localStorage.getItem('ep_spring')==='1';
 let sandEnabled=localStorage.getItem('ep_sand')==='1';
 let radioactiveEnabled=localStorage.getItem('ep_radioactive')==='1';
+let thunderEnabled=localStorage.getItem('ep_thunder')==='1';
+let grassEnabled=localStorage.getItem('ep_grass')==='1';
 let particlesEnabled=localStorage.getItem('ep_particles')!=='0'; // per-scene particle toggle
 let seasonalMode=localStorage.getItem('ep_seasonal')==='1';
 
@@ -74,18 +121,22 @@ function drawNightScene(W,H){
   pg.addColorStop(0,'rgba(255,0,120,.06)');pg.addColorStop(1,'transparent');
   ctx.fillStyle=pg;ctx.fillRect(0,0,W,H);
   // Buildings
-  buildings.forEach(b=>{
+  buildings.forEach((b,bi)=>{
     const baseY=H*.85,bx=b.x,by=baseY-b.h;
     ctx.fillStyle=b.color;ctx.fillRect(bx,by,b.w,b.h);
     ctx.strokeStyle='rgba(0,200,255,.06)';ctx.lineWidth=1;ctx.strokeRect(bx,by,b.w,b.h);
-    b.windows.forEach(win=>{
-      if(!win.lit)return;
-      if(win.flicker&&(frame%90<3||frame%150>145))return;
-      ctx.fillStyle=win.color;
-      ctx.globalAlpha=.55+.3*Math.sin(frame*.02+win.col);
-      ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
-      ctx.globalAlpha=1;
-    });
+    if(windowAnimations){
+      b.windows.forEach(win=>{
+        if(!win.lit)return;
+        if(win.flicker&&(frame%90<3||frame%150>145))return;
+        ctx.fillStyle=win.color;
+        ctx.globalAlpha=.55+.3*Math.sin(frame*.02+win.col);
+        ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
+        ctx.globalAlpha=1;
+      });
+    } else {
+      drawWindowsDirect(bx,by,b.w,b.h,bi,'#00e5ff','#80d8ff','#0288d1',0.6);
+    }
     ctx.fillStyle='rgba(0,229,255,.04)';ctx.fillRect(bx,by,b.w,2);
   });
   // Ground
@@ -174,7 +225,7 @@ function drawSummerScene(W,H){
 
   // Daytime buildings — warm tan/sandstone tones
   const baseY=H*0.85;
-  buildings.forEach(b=>{
+  buildings.forEach((b,bi)=>{
     const bx=b.x, by=baseY-b.h;
     // Building face — warm gradient
     const bg=ctx.createLinearGradient(bx,by,bx+b.w,by);
@@ -188,13 +239,17 @@ function drawSummerScene(W,H){
     // Sun-facing highlight on left edge
     ctx.fillStyle='rgba(255,230,150,0.12)';
     ctx.fillRect(bx,by,3,b.h);
-    // Windows — daytime, mostly dark with some lit
-    b.windows.forEach(win=>{
-      ctx.globalAlpha= win.lit ? 0.55 : 0.15;
-      ctx.fillStyle= win.lit ? 'rgba(255,240,200,0.9)' : 'rgba(80,60,30,0.6)';
-      ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
-      ctx.globalAlpha=1;
-    });
+    // Windows — daytime
+    if(windowAnimations){
+      b.windows.forEach(win=>{
+        ctx.globalAlpha= win.lit ? 0.55 : 0.15;
+        ctx.fillStyle= win.lit ? 'rgba(255,240,200,0.9)' : 'rgba(80,60,30,0.6)';
+        ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
+        ctx.globalAlpha=1;
+      });
+    } else {
+      drawWindowsDirect(bx,by,b.w,b.h,bi,'rgba(255,240,200,0.9)','rgba(255,240,200,0.9)','rgba(255,240,200,0.9)',0.55);
+    }
     // Rooftop warm glow
     ctx.fillStyle='rgba(255,200,50,0.08)';ctx.fillRect(bx,by,b.w,2);
   });
@@ -320,7 +375,7 @@ function drawWinterScene(W,H){
 
   // Snow-covered buildings — icy steel-blue/slate tones
   const baseY=H*0.85;
-  buildings.forEach(b=>{
+  buildings.forEach((b,bi)=>{
     const bx=b.x, by=baseY-b.h;
     // Building body gradient — cold steel
     const bg=ctx.createLinearGradient(bx,by,bx+b.w,by);
@@ -331,15 +386,19 @@ function drawWinterScene(W,H){
     ctx.strokeRect(bx,by,b.w,b.h);
     // Moon-reflection highlight on one edge
     ctx.fillStyle='rgba(200,230,255,0.06)'; ctx.fillRect(bx,by,2,b.h);
-    // Windows — cold blue-white, flickering like frost
-    b.windows.forEach(win=>{
-      if(!win.lit) return;
-      if(win.flicker&&(frame%80<3||frame%130>127)) return;
-      ctx.fillStyle='rgba(180,220,255,0.7)';
-      ctx.globalAlpha=0.4+0.25*Math.sin(frame*0.018+win.col*0.5);
-      ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
-      ctx.globalAlpha=1;
-    });
+    // Windows — cold blue-white
+    if(windowAnimations){
+      b.windows.forEach(win=>{
+        if(!win.lit) return;
+        if(win.flicker&&(frame%80<3||frame%130>127)) return;
+        ctx.fillStyle='rgba(180,220,255,0.7)';
+        ctx.globalAlpha=0.4+0.25*Math.sin(frame*0.018+win.col*0.5);
+        ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
+        ctx.globalAlpha=1;
+      });
+    } else {
+      drawWindowsDirect(bx,by,b.w,b.h,bi,'rgba(180,220,255,0.7)','rgba(180,220,255,0.7)','rgba(180,220,255,0.7)',0.45);
+    }
     // Snow cap on rooftop
     const snowCapH=3+Math.random()*0.5;
     ctx.fillStyle='rgba(220,240,255,0.85)';
@@ -517,7 +576,7 @@ function drawFallScene(W,H){
 
   // Buildings — dark warm silhouettes
   const baseY=H*0.82;
-  buildings.forEach(b=>{
+  buildings.forEach((b,bi)=>{
     const bx=b.x, by=baseY-b.h;
     // Silhouette darker near top, slight warm tint near base
     const bg=ctx.createLinearGradient(bx,by,bx,baseY);
@@ -527,16 +586,20 @@ function drawFallScene(W,H){
     ctx.fillStyle=bg; ctx.fillRect(bx,by,b.w,b.h);
     ctx.strokeStyle='rgba(200,100,10,0.06)'; ctx.lineWidth=1;
     ctx.strokeRect(bx,by,b.w,b.h);
-    // Warm window glow — amber/orange, some with warm white
-    b.windows.forEach(win=>{
-      if(!win.lit) return;
-      if(win.flicker&&(frame%85<3||frame%140>137)) return;
-      const wc=Math.random()>0.5?'rgba(255,180,60,':'rgba(255,220,120,';
-      ctx.fillStyle=wc+'0.85)';
-      ctx.globalAlpha=0.45+0.3*Math.sin(frame*0.02+win.col*0.7);
-      ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
-      ctx.globalAlpha=1;
-    });
+    // Warm window glow — amber/orange
+    if(windowAnimations){
+      b.windows.forEach(win=>{
+        if(!win.lit) return;
+        if(win.flicker&&(frame%85<3||frame%140>137)) return;
+        const wc=Math.random()>0.5?'rgba(255,180,60,':'rgba(255,220,120,';
+        ctx.fillStyle=wc+'0.85)';
+        ctx.globalAlpha=0.45+0.3*Math.sin(frame*0.02+win.col*0.7);
+        ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
+        ctx.globalAlpha=1;
+      });
+    } else {
+      drawWindowsDirect(bx,by,b.w,b.h,bi,'rgba(255,180,60,0.85)','rgba(255,220,120,0.85)','rgba(255,180,60,0.85)',0.55);
+    }
     // Rooftop warm edge-light from sun
     const rimAlpha=0.08+0.04*Math.sin(frame*0.01);
     ctx.fillStyle=`rgba(220,140,20,${rimAlpha})`;
@@ -650,7 +713,7 @@ function drawSpringScene(W,H){
 
   // Buildings — fresh spring greens with ivy tones
   const baseY=H*0.82;
-  buildings.forEach(b=>{
+  buildings.forEach((b,bi)=>{
     const bx=b.x, by=baseY-b.h;
     const bg=ctx.createLinearGradient(bx,by,bx+b.w,by);
     bg.addColorStop(0,b.springColor||'#b8d090'); bg.addColorStop(1,b.springColorB||'#a0c078');
@@ -659,12 +722,16 @@ function drawSpringScene(W,H){
     // Sun highlight
     ctx.fillStyle='rgba(255,255,200,0.1)'; ctx.fillRect(bx,by,3,b.h);
     // Windows — daytime, warm white with green tint
-    b.windows.forEach(win=>{
-      ctx.globalAlpha=win.lit?0.5:0.12;
-      ctx.fillStyle=win.lit?'rgba(220,255,200,0.9)':'rgba(80,120,60,0.4)';
-      ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
-      ctx.globalAlpha=1;
-    });
+    if(windowAnimations){
+      b.windows.forEach(win=>{
+        ctx.globalAlpha=win.lit?0.5:0.12;
+        ctx.fillStyle=win.lit?'rgba(220,255,200,0.9)':'rgba(80,120,60,0.4)';
+        ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
+        ctx.globalAlpha=1;
+      });
+    } else {
+      drawWindowsDirect(bx,by,b.w,b.h,bi,'rgba(220,255,200,0.9)','rgba(220,255,200,0.9)','rgba(220,255,200,0.9)',0.5);
+    }
     // Rooftop flower/grass strip
     const stripH=Math.min(6,b.w*0.15);
     const flowerCols=['#f9a8c0','#c8e870','#f5c842','#e080c8','#88d8a0'];
@@ -820,7 +887,7 @@ function drawSandScene(W,H){
 
   // Buildings — sepia silhouettes with amber windows
   const baseY=H*0.83;
-  buildings.forEach(b=>{
+  buildings.forEach((b,bi)=>{
     const bx=b.x, by=baseY-b.h;
     const bg=ctx.createLinearGradient(bx,by,bx,baseY);
     bg.addColorStop(0,b.sandColor||'#2e1c06');
@@ -828,14 +895,18 @@ function drawSandScene(W,H){
     ctx.fillStyle=bg; ctx.fillRect(bx,by,b.w,b.h);
     ctx.strokeStyle='rgba(180,120,30,0.08)'; ctx.lineWidth=1; ctx.strokeRect(bx,by,b.w,b.h);
     // Amber-glowing windows
-    b.windows.forEach(win=>{
-      if(!win.lit) return;
-      if(win.flicker&&(frame%70<4||frame%110>106)) return;
-      ctx.fillStyle='rgba(255,180,50,0.88)';
-      ctx.globalAlpha=0.4+0.35*Math.sin(frame*0.025+win.col*0.8+win.row*0.5);
-      ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
-      ctx.globalAlpha=1;
-    });
+    if(windowAnimations){
+      b.windows.forEach(win=>{
+        if(!win.lit) return;
+        if(win.flicker&&(frame%70<4||frame%110>106)) return;
+        ctx.fillStyle='rgba(255,180,50,0.88)';
+        ctx.globalAlpha=0.4+0.35*Math.sin(frame*0.025+win.col*0.8+win.row*0.5);
+        ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
+        ctx.globalAlpha=1;
+      });
+    } else {
+      drawWindowsDirect(bx,by,b.w,b.h,bi,'rgba(255,180,50,0.88)','rgba(255,180,50,0.88)','rgba(255,180,50,0.88)',0.55);
+    }
     // Dusty rooftop
     ctx.fillStyle=`rgba(180,130,40,${0.07+0.04*Math.sin(frame*0.008)})`;
     ctx.fillRect(bx,by,b.w,2);
@@ -961,7 +1032,7 @@ function drawRadioactiveScene(W,H){
 
   // Dark overgrown buildings with eerie green windows
   const baseY=H*0.83;
-  buildings.forEach(b=>{
+  buildings.forEach((b,bi)=>{
     const bx=b.x, by=baseY-b.h;
     const bg=ctx.createLinearGradient(bx,by,bx,baseY);
     bg.addColorStop(0,b.radioColor||'#081408');
@@ -969,18 +1040,21 @@ function drawRadioactiveScene(W,H){
     ctx.fillStyle=bg; ctx.fillRect(bx,by,b.w,b.h);
     ctx.strokeStyle='rgba(57,255,20,0.06)'; ctx.lineWidth=1; ctx.strokeRect(bx,by,b.w,b.h);
     // Toxic green windows
-    b.windows.forEach(win=>{
-      if(!win.lit) return;
-      if(win.flicker&&(frame%65<4||frame%105>101)) return;
-      ctx.fillStyle='rgba(57,255,20,0.9)';
-      ctx.globalAlpha=0.3+0.4*Math.sin(frame*0.022+win.col*0.9+win.row*0.6);
-      ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
-      ctx.globalAlpha=1;
-      // Window glow bloom
-      const wg=ctx.createRadialGradient(bx+5+win.col*7,by+7+win.row*10,0,bx+5+win.col*7,by+7+win.row*10,8);
-      wg.addColorStop(0,'rgba(57,255,20,0.15)'); wg.addColorStop(1,'transparent');
-      ctx.fillStyle=wg; ctx.fillRect(bx+win.col*7-4,by+win.row*10-4,16,14);
-    });
+    if(windowAnimations){
+      b.windows.forEach(win=>{
+        if(!win.lit) return;
+        if(win.flicker&&(frame%65<4||frame%105>101)) return;
+        ctx.fillStyle='rgba(57,255,20,0.9)';
+        ctx.globalAlpha=0.3+0.4*Math.sin(frame*0.022+win.col*0.9+win.row*0.6);
+        ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
+        ctx.globalAlpha=1;
+        const wg=ctx.createRadialGradient(bx+5+win.col*7,by+7+win.row*10,0,bx+5+win.col*7,by+7+win.row*10,8);
+        wg.addColorStop(0,'rgba(57,255,20,0.15)'); wg.addColorStop(1,'transparent');
+        ctx.fillStyle=wg; ctx.fillRect(bx+win.col*7-4,by+win.row*10-4,16,14);
+      });
+    } else {
+      drawWindowsDirect(bx,by,b.w,b.h,bi,'rgba(57,255,20,0.9)','rgba(57,255,20,0.9)','rgba(57,255,20,0.9)',0.5);
+    }
     // Ivy/vine overgrowth on building sides
     ctx.strokeStyle='rgba(40,180,10,0.3)'; ctx.lineWidth=1.2;
     for(let v=0;v<Math.floor(b.h/25);v++){
@@ -1042,6 +1116,388 @@ function drawRadioactiveScene(W,H){
   }
 }
 
+// ── Thunder City particles ──
+const thunderDebris=[];
+let thunderBolt={active:false,branches:[],timer:0,flashAlpha:0};
+let thunderClouds=[];
+function initThunder(){
+  thunderDebris.length=0;
+  const W=canvas.width,H=canvas.height;
+  for(let i=0;i<180;i++) thunderDebris.push({
+    x:Math.random()*W, y:Math.random()*H,
+    len:4+Math.random()*10, angle:0.15+Math.random()*0.25,
+    speed:8+Math.random()*14, opacity:0.1+Math.random()*0.4,
+    wobble:Math.random()*Math.PI*2, wobbleSpeed:0.015+Math.random()*0.02
+  });
+  thunderClouds=[
+    {x:0.1,y:0.12,r:0.22,s:0.06,flicker:0},{x:0.38,y:0.08,r:0.28,s:0.04,flicker:0},
+    {x:0.65,y:0.14,r:0.24,s:0.07,flicker:0},{x:0.85,y:0.09,r:0.2,s:0.05,flicker:0},
+    {x:0.25,y:0.22,r:0.18,s:0.03,flicker:0},{x:0.55,y:0.2,r:0.22,s:0.06,flicker:0}
+  ];
+}
+initThunder();
+function triggerThunderBolt(W,H){
+  thunderBolt.active=true; thunderBolt.timer=32; thunderBolt.flashAlpha=0.22;
+  thunderBolt.branches=[];
+  let cx=W*0.15+Math.random()*W*0.7, cy=0;
+  while(cy<H*0.82){
+    const nx=cx+(Math.random()-0.5)*90, ny=cy+28+Math.random()*45;
+    thunderBolt.branches.push({x1:cx,y1:cy,x2:nx,y2:ny});
+    cx=nx; cy=ny;
+    if(Math.random()>0.6&&cy<H*0.55){
+      let bx=cx,by=cy;
+      for(let b=0;b<4;b++){
+        const bx2=bx+(Math.random()-0.5)*65, by2=by+18+Math.random()*28;
+        thunderBolt.branches.push({x1:bx,y1:by,x2:bx2,y2:by2,sub:true});
+        bx=bx2; by=by2;
+      }
+    }
+  }
+}
+
+function drawThunderScene(W,H){
+  if(!W||!H||!isFinite(W)||!isFinite(H)) return;
+
+  // Deep storm sky — near-black at top, dark blue-grey to horizon
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#060810');
+  sky.addColorStop(0.25,'#0a0e1a');
+  sky.addColorStop(0.5,'#0e1428');
+  sky.addColorStop(0.75,'#121c38');
+  sky.addColorStop(1,'#0e1830');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+
+  // Ambient electric blue glow behind clouds
+  const aura=ctx.createRadialGradient(W*0.5,H*0.15,0,W*0.5,H*0.15,Math.max(1,W*0.55));
+  aura.addColorStop(0,'rgba(80,120,255,0.08)');
+  aura.addColorStop(0.5,'rgba(60,80,200,0.04)');
+  aura.addColorStop(1,'transparent');
+  ctx.fillStyle=aura; ctx.fillRect(0,0,W,H);
+
+  // Lightning flash overlay
+  if(thunderBolt.active&&thunderBolt.flashAlpha>0){
+    ctx.fillStyle=`rgba(160,180,255,${thunderBolt.flashAlpha})`;
+    ctx.fillRect(0,0,W,H);
+    thunderBolt.flashAlpha*=0.72;
+  }
+
+  // Heavy storm clouds
+  thunderClouds.forEach(tc=>{
+    tc.flicker=(tc.flicker||0)+1;
+    const cx=((tc.x*W+frame*tc.s)%(W+tc.r*W*2))-tc.r*W;
+    const cy=tc.y*H+Math.sin(frame*0.004+tc.x*3)*H*0.02;
+    const cr=Math.max(1,tc.r*W);
+    // Dark broiling cloud layers
+    for(let layer=0;layer<3;layer++){
+      const la=0.55-layer*0.15;
+      const lshift=(layer-1)*cr*0.18;
+      const cg=ctx.createRadialGradient(cx+lshift,cy,0,cx+lshift,cy,cr*(1+layer*0.12));
+      cg.addColorStop(0,`rgba(18,22,40,${la})`);
+      cg.addColorStop(0.6,`rgba(12,16,30,${la*0.7})`);
+      cg.addColorStop(1,'transparent');
+      ctx.fillStyle=cg;
+      ctx.beginPath(); ctx.ellipse(cx+lshift,cy,cr*(1+layer*0.1),cr*0.42,0,0,Math.PI*2); ctx.fill();
+    }
+    // Electric highlight on cloud edge when bolt is active
+    if(thunderBolt.active&&thunderBolt.flashAlpha>0.02){
+      ctx.globalAlpha=thunderBolt.flashAlpha*1.8;
+      const eg=ctx.createRadialGradient(cx,cy,cr*0.4,cx,cy,cr);
+      eg.addColorStop(0,'transparent'); eg.addColorStop(1,'rgba(120,160,255,0.5)');
+      ctx.fillStyle=eg;
+      ctx.beginPath(); ctx.ellipse(cx,cy,cr,cr*0.42,0,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+  });
+
+  // Buildings — dark blue-grey storm silhouettes
+  const baseY=H*0.84;
+  buildings.forEach((b,bi)=>{
+    const bx=b.x, by=baseY-b.h;
+    const bg=ctx.createLinearGradient(bx,by,bx+b.w,by);
+    bg.addColorStop(0,b.thunderColor||'#1a2035');
+    bg.addColorStop(1,b.thunderColorB||'#121828');
+    ctx.fillStyle=bg; ctx.fillRect(bx,by,b.w,b.h);
+    ctx.strokeStyle='rgba(80,120,255,0.07)'; ctx.lineWidth=1; ctx.strokeRect(bx,by,b.w,b.h);
+    // Electric blue-white windows
+    if(windowAnimations){
+      b.windows.forEach(win=>{
+        if(!win.lit) return;
+        const stormFlicker=thunderBolt.active&&Math.random()>0.7;
+        if(win.flicker&&(frame%60<4||frame%95>92)&&!stormFlicker) return;
+        ctx.fillStyle=stormFlicker?'rgba(220,230,255,0.95)':'rgba(140,180,255,0.75)';
+        ctx.globalAlpha=stormFlicker?0.9:(0.35+0.3*Math.sin(frame*0.025+win.col*0.6));
+        ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
+        ctx.globalAlpha=1;
+      });
+    } else {
+      drawWindowsDirect(bx,by,b.w,b.h,bi,'rgba(140,180,255,0.75)','rgba(140,180,255,0.75)','rgba(140,180,255,0.75)',0.5);
+    }
+    // Storm-lit rooftop edge
+    const rA=thunderBolt.active?0.18+thunderBolt.flashAlpha:0.04;
+    ctx.fillStyle=`rgba(100,140,255,${rA})`; ctx.fillRect(bx,by,b.w,2);
+  });
+
+  // Dark storm ground with electric puddle reflections
+  const rg=ctx.createLinearGradient(0,baseY,0,H);
+  rg.addColorStop(0,'rgba(30,50,120,0.25)');
+  rg.addColorStop(0.4,'rgba(15,25,70,0.18)');
+  rg.addColorStop(1,'#050810');
+  ctx.fillStyle=rg; ctx.fillRect(0,baseY,W,H-baseY);
+  // Puddle shimmer
+  const ps=ctx.createLinearGradient(0,baseY,0,baseY+25);
+  ps.addColorStop(0,'rgba(80,120,255,0.15)'); ps.addColorStop(1,'transparent');
+  ctx.fillStyle=ps; ctx.fillRect(0,baseY,W,25);
+
+  // Lightning bolt
+  if(thunderBolt.active){
+    thunderBolt.timer--;
+    if(thunderBolt.timer<=0) thunderBolt.active=false;
+    const la=Math.min(1,(thunderBolt.timer/32)*1.4);
+    ctx.save();
+    thunderBolt.branches.forEach(seg=>{
+      ctx.strokeStyle=seg.sub?`rgba(140,180,255,${la*0.6})`:`rgba(210,230,255,${la*0.98})`;
+      ctx.lineWidth=seg.sub?0.9:2.5;
+      ctx.shadowColor='rgba(100,150,255,0.95)'; ctx.shadowBlur=seg.sub?8:20;
+      ctx.beginPath(); ctx.moveTo(seg.x1,seg.y1); ctx.lineTo(seg.x2,seg.y2); ctx.stroke();
+    });
+    ctx.restore();
+  }
+  if(Math.random()<0.006&&!thunderBolt.active) triggerThunderBolt(W,H);
+
+  // Rain/debris particles
+  if(particlesEnabled){
+    ctx.lineCap='round';
+    thunderDebris.forEach(d=>{
+      d.wobble+=d.wobbleSpeed;
+      d.y+=d.speed; d.x+=d.speed*Math.sin(d.angle)+Math.sin(d.wobble)*0.4;
+      if(d.y>H){d.y=-d.len; d.x=Math.random()*W;}
+      const flashBoost=thunderBolt.active?thunderBolt.flashAlpha*2:0;
+      ctx.strokeStyle=`rgba(160,200,255,${Math.min(1,d.opacity+flashBoost)})`;
+      ctx.lineWidth=0.8;
+      ctx.globalAlpha=d.opacity+flashBoost*0.5;
+      ctx.beginPath(); ctx.moveTo(d.x,d.y); ctx.lineTo(d.x+d.len*Math.sin(d.angle),d.y+d.len); ctx.stroke();
+    });
+    ctx.globalAlpha=1;
+  }
+}
+
+// ── Grass City particles ──
+const grassParticles=[];
+let grassLightning={active:false,branches:[],timer:0,flashAlpha:0};
+function initGrass(){
+  grassParticles.length=0;
+  const W=canvas.width,H=canvas.height;
+  // Butterflies + floating seeds + petals mixed
+  for(let i=0;i<120;i++){
+    const type=Math.random()<0.3?'butterfly':(Math.random()<0.5?'seed':'leaf');
+    grassParticles.push({
+      type, x:Math.random()*W, y:Math.random()*H,
+      size:type==='butterfly'?10+Math.random()*8:3+Math.random()*6,
+      speedX:(Math.random()-0.5)*0.6, speedY:-0.2-Math.random()*0.5,
+      wobble:Math.random()*Math.PI*2, wobbleSpeed:0.018+Math.random()*0.025,
+      wingPhase:Math.random()*Math.PI*2, wingSpeed:0.08+Math.random()*0.07,
+      dir:Math.random()>0.5?1:-1, life:Math.random(),
+      col:type==='butterfly'?
+        (Math.random()>0.5?['#e87820','#f5a020']:['#d040a0','#f080c0']):
+        (type==='seed'?'rgba(200,255,160,':'rgba(120,220,80,')
+    });
+  }
+}
+initGrass();
+function triggerGrassLightning(W,H){
+  grassLightning.active=true; grassLightning.timer=20; grassLightning.flashAlpha=0.1;
+  grassLightning.branches=[];
+  let cx=W*0.1+Math.random()*W*0.8, cy=0;
+  while(cy<H*0.8){
+    const nx=cx+(Math.random()-0.5)*60, ny=cy+22+Math.random()*32;
+    grassLightning.branches.push({x1:cx,y1:cy,x2:nx,y2:ny});
+    cx=nx; cy=ny;
+    if(Math.random()>0.65&&cy<H*0.5){
+      let bx=cx,by=cy;
+      for(let b=0;b<3;b++){
+        const bx2=bx+(Math.random()-0.5)*45, by2=by+14+Math.random()*22;
+        grassLightning.branches.push({x1:bx,y1:by,x2:bx2,y2:by2,sub:true});
+        bx=bx2; by=by2;
+      }
+    }
+  }
+}
+
+function drawGrassScene(W,H){
+  if(!W||!H||!isFinite(W)||!isFinite(H)) return;
+
+  // Forest atmosphere — deep rich greens, god-ray light from behind
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#061008');
+  sky.addColorStop(0.2,'#0a1a0c');
+  sky.addColorStop(0.45,'#102814');
+  sky.addColorStop(0.7,'#1a3c1e');
+  sky.addColorStop(0.88,'#224828');
+  sky.addColorStop(1,'#1a3c20');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+
+  // Central god-ray glow from behind skyline
+  const godRayX=W*0.5, godRayY=H*0.35;
+  const gr=ctx.createRadialGradient(godRayX,godRayY,0,godRayX,godRayY,Math.max(1,W*0.5));
+  gr.addColorStop(0,'rgba(180,255,120,0.18)');
+  gr.addColorStop(0.3,'rgba(100,200,60,0.1)');
+  gr.addColorStop(0.7,'rgba(60,140,30,0.05)');
+  gr.addColorStop(1,'transparent');
+  ctx.fillStyle=gr; ctx.fillRect(0,0,W,H);
+
+  // God-ray shafts
+  const rayCount=10;
+  ctx.save();
+  for(let i=0;i<rayCount;i++){
+    const angle=-Math.PI*0.6+(i/(rayCount-1))*Math.PI*0.55;
+    const len=H*1.2;
+    const rAlpha=0.025+0.015*Math.sin(frame*0.006+i*0.8);
+    ctx.globalAlpha=rAlpha;
+    ctx.fillStyle='rgba(160,255,80,1)';
+    ctx.beginPath();
+    ctx.moveTo(godRayX,godRayY);
+    ctx.lineTo(godRayX+Math.cos(angle-0.018)*len, godRayY+Math.sin(angle-0.018)*len);
+    ctx.lineTo(godRayX+Math.cos(angle+0.018)*len, godRayY+Math.sin(angle+0.018)*len);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+
+  // Floating fog layers at mid-height
+  ctx.globalAlpha=0.04+0.02*Math.sin(frame*0.005);
+  [{x:0.2,y:0.55,r:0.25,s:0.07},{x:0.6,y:0.5,r:0.3,s:0.05},{x:0.85,y:0.6,r:0.2,s:0.09}].forEach(fg=>{
+    const cx=((fg.x*W+frame*fg.s)%(W+fg.r*W*2))-fg.r*W;
+    const cr=Math.max(1,fg.r*W);
+    const gg=ctx.createRadialGradient(cx,fg.y*H,0,cx,fg.y*H,cr);
+    gg.addColorStop(0,'rgba(80,180,40,0.8)'); gg.addColorStop(1,'transparent');
+    ctx.fillStyle=gg; ctx.beginPath(); ctx.ellipse(cx,fg.y*H,cr,cr*0.35,0,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // Lightning flash
+  if(grassLightning.active&&grassLightning.flashAlpha>0){
+    ctx.fillStyle=`rgba(120,255,60,${grassLightning.flashAlpha})`;
+    ctx.fillRect(0,0,W,H);
+    grassLightning.flashAlpha*=0.8;
+  }
+
+  // Buildings — dark green, heavily ivy/moss covered
+  const baseY=H*0.82;
+  buildings.forEach((b,bi)=>{
+    const bx=b.x, by=baseY-b.h;
+    const bg=ctx.createLinearGradient(bx,by,bx,baseY);
+    bg.addColorStop(0,b.grassColor||'#0e2010');
+    bg.addColorStop(1,b.grassColorB||'#081408');
+    ctx.fillStyle=bg; ctx.fillRect(bx,by,b.w,b.h);
+    ctx.strokeStyle='rgba(60,180,30,0.1)'; ctx.lineWidth=1; ctx.strokeRect(bx,by,b.w,b.h);
+    // Moss/vine coverage patches on building faces
+    const mossRows=Math.floor(b.h/18);
+    for(let mr=0;mr<mossRows;mr++){
+      if(Math.random()>0.55){
+        const mw=4+Math.random()*b.w*0.6, mh=6+Math.random()*10;
+        const mx=bx+Math.random()*(b.w-mw), my=by+mr*18+Math.random()*8;
+        ctx.globalAlpha=0.18+Math.random()*0.2;
+        ctx.fillStyle=Math.random()>0.5?'#2a6020':'#386828';
+        ctx.fillRect(mx,my,mw,mh);
+        ctx.globalAlpha=1;
+      }
+    }
+    // Glowing green windows
+    if(windowAnimations){
+      b.windows.forEach(win=>{
+        if(!win.lit) return;
+        if(win.flicker&&(frame%80<4||frame%120>117)) return;
+        ctx.fillStyle='rgba(80,220,40,0.85)';
+        ctx.globalAlpha=0.3+0.35*Math.sin(frame*0.02+win.col*0.7+win.row*0.5);
+        ctx.fillRect(bx+3+win.col*7,by+5+win.row*10,4,5);
+        ctx.globalAlpha=1;
+      });
+    } else {
+      drawWindowsDirect(bx,by,b.w,b.h,bi,'rgba(80,220,40,0.85)','rgba(80,220,40,0.85)','rgba(80,220,40,0.85)',0.45);
+    }
+    // Hanging vine tendrils from rooftop
+    ctx.strokeStyle='rgba(50,160,30,0.4)'; ctx.lineWidth=1.2;
+    const vineCount=Math.floor(b.w/8);
+    for(let v=0;v<vineCount;v++){
+      const vx=bx+4+v*8;
+      const vlen=8+((v*7+Math.floor(b.h))%20);
+      ctx.beginPath(); ctx.moveTo(vx,by);
+      ctx.quadraticCurveTo(vx+(Math.random()-0.5)*6,by+vlen*0.5,vx+(Math.random()-0.5)*4,by+vlen);
+      ctx.stroke();
+    }
+    // Rooftop vegetation bloom
+    ctx.fillStyle=`rgba(60,180,30,${0.08+0.05*Math.sin(frame*0.01+b.x*0.01)})`;
+    ctx.fillRect(bx,by,b.w,4);
+  });
+
+  // Rich forest ground — dark greens with flowers
+  const rg=ctx.createLinearGradient(0,baseY,0,H);
+  rg.addColorStop(0,'rgba(40,120,20,0.4)');
+  rg.addColorStop(0.35,'rgba(25,80,12,0.3)');
+  rg.addColorStop(1,'#050e04');
+  ctx.fillStyle=rg; ctx.fillRect(0,baseY,W,H-baseY);
+  // Ground shimmer
+  const gs=ctx.createLinearGradient(0,baseY,0,baseY+30);
+  gs.addColorStop(0,'rgba(80,200,40,0.15)'); gs.addColorStop(1,'transparent');
+  ctx.fillStyle=gs; ctx.fillRect(0,baseY,W,30);
+
+  // Green lightning
+  if(grassLightning.active){
+    grassLightning.timer--;
+    if(grassLightning.timer<=0) grassLightning.active=false;
+    const la=Math.min(1,(grassLightning.timer/20)*1.5);
+    ctx.save();
+    grassLightning.branches.forEach(seg=>{
+      ctx.strokeStyle=seg.sub?`rgba(100,255,60,${la*0.5})`:`rgba(160,255,80,${la*0.95})`;
+      ctx.lineWidth=seg.sub?0.9:2.0;
+      ctx.shadowColor='rgba(80,220,30,0.9)'; ctx.shadowBlur=seg.sub?6:14;
+      ctx.beginPath(); ctx.moveTo(seg.x1,seg.y1); ctx.lineTo(seg.x2,seg.y2); ctx.stroke();
+    });
+    ctx.restore();
+  }
+  if(Math.random()<0.004&&!grassLightning.active) triggerGrassLightning(W,H);
+
+  // Butterflies, floating seeds, leaves
+  if(particlesEnabled){
+    grassParticles.forEach(p=>{
+      p.wobble+=p.wobbleSpeed; p.life+=0.002;
+      p.x+=p.speedX+Math.sin(p.wobble)*0.7;
+      p.y+=p.speedY+Math.cos(p.wobble*0.8)*0.3;
+      if(p.y<-p.size*3||p.life>1){ p.y=baseY+p.size; p.x=Math.random()*W; p.life=0; }
+      if(p.x>W+p.size*2) p.x=-p.size; if(p.x<-p.size*2) p.x=W+p.size;
+      const fade=Math.sin(p.life*Math.PI);
+      if(p.type==='butterfly'){
+        p.wingPhase+=p.wingSpeed;
+        p.x+=p.speedX*p.dir*0.6;
+        const wFlap=Math.sin(p.wingPhase)*p.size;
+        const [bodyCol,wingFill]=p.col;
+        ctx.save(); ctx.translate(p.x,p.y); ctx.globalAlpha=0.8*fade;
+        [[1],[- 1]].forEach(([sx])=>{
+          ctx.fillStyle=wingFill;
+          ctx.beginPath();
+          ctx.ellipse(sx*p.size*0.55,0,p.size*0.7,Math.abs(wFlap)*0.5+p.size*0.2,-0.3*sx,0,Math.PI*2);
+          ctx.fill();
+        });
+        ctx.fillStyle=bodyCol;
+        ctx.beginPath(); ctx.ellipse(0,0,p.size*0.15,p.size*0.6,0,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+      } else if(p.type==='seed'){
+        ctx.globalAlpha=0.55*fade;
+        ctx.fillStyle=p.col+`${0.55*fade})`;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size*0.4,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle=p.col+`${0.4*fade})`;
+        ctx.lineWidth=0.8;
+        ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x+Math.sin(p.wobble)*p.size*1.5,p.y-p.size*1.5); ctx.stroke();
+      } else {
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.wobble); ctx.globalAlpha=0.65*fade;
+        ctx.fillStyle='rgba(60,180,30,0.8)';
+        ctx.beginPath(); ctx.ellipse(0,0,p.size*0.35,p.size,0,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+      }
+    });
+    ctx.globalAlpha=1;
+  }
+}
+
 function getSeasonFromDate(){
   const m=new Date().getMonth()+1, d=new Date().getDate();
   // Spring: Mar 20 – Jun 20, Summer: Jun 21 – Sep 21, Fall: Sep 22 – Dec 20, Winter: Dec 21 – Mar 19
@@ -1056,7 +1512,7 @@ function applySeasonalMode(){
   const s=getSeasonFromDate();
   summerEnabled=s==='summer'; winterEnabled=s==='winter';
   fallEnabled=s==='fall'; springEnabled=s==='spring';
-  sandEnabled=false; radioactiveEnabled=false;
+  sandEnabled=false; radioactiveEnabled=false; thunderEnabled=false; grassEnabled=false;
 }
 
 function draw(){
@@ -1067,6 +1523,8 @@ function draw(){
   else if(springEnabled)      drawSpringScene(W,H);
   else if(sandEnabled)        drawSandScene(W,H);
   else if(radioactiveEnabled) drawRadioactiveScene(W,H);
+  else if(thunderEnabled)     drawThunderScene(W,H);
+  else if(grassEnabled)       drawGrassScene(W,H);
   else                        drawNightScene(W,H);
   requestAnimationFrame(draw);
 }
@@ -1182,93 +1640,210 @@ function renderBookmarksPanel(){
 // ═══════════════════════════════════════════
 //  DOWNLOADS
 // ═══════════════════════════════════════════
-let downloads=JSON.parse(localStorage.getItem('ep_downloads')||'[]');
+// ═══════════════════════════════════════════
+//  SESSION ID
+// ═══════════════════════════════════════════
+function generateSessionId(){
+  return 'ep_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
+}
+let sessionId = sessionStorage.getItem('ep_session_id');
+if(!sessionId){ sessionId=generateSessionId(); sessionStorage.setItem('ep_session_id',sessionId); }
+
+// Session-scoped storage helpers (survive page reload within same tab, cleared on tab close)
+function sessionGet(key){ try{ return JSON.parse(sessionStorage.getItem(sessionId+'_'+key)||'null'); }catch{ return null; } }
+function sessionSet(key,val){ try{ sessionStorage.setItem(sessionId+'_'+key,JSON.stringify(val)); }catch{} }
+
+// ═══════════════════════════════════════════
+//  DOWNLOADS  (real file saving via Blob URL)
+// ═══════════════════════════════════════════
+let downloads=sessionGet('downloads')||JSON.parse(localStorage.getItem('ep_downloads')||'[]');
 let nextDlId=downloads.length?Math.max(...downloads.map(d=>d.id))+1:1;
-function saveDownloads(){localStorage.setItem('ep_downloads',JSON.stringify(downloads));}
+function saveDownloads(){
+  sessionSet('downloads', downloads);
+  // Also persist metadata (not blob data) to localStorage for history
+  const meta=downloads.map(d=>({id:d.id,name:d.name,url:d.url,size:d.size,status:d.status,progress:d.progress,time:d.time}));
+  localStorage.setItem('ep_downloads',JSON.stringify(meta));
+}
 function updateDlBadge(){
   const badge=document.getElementById('dl-badge');
   const active=downloads.filter(d=>d.status==='downloading').length;
   if(badge){badge.style.display=active>0?'flex':'none';badge.textContent=active;}
 }
+
 function renderDownloadsPanel(){
   const body=document.getElementById('downloads-body');
   if(!body)return;
   body.innerHTML='';
-  // Manual add row
+
+  // Session badge
+  const sesRow=document.createElement('div');
+  sesRow.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:6px 10px;background:rgba(0,229,255,0.06);border-radius:8px;border:1px solid rgba(0,229,255,0.12);';
+  sesRow.innerHTML=`<span style="font-size:10px;color:rgba(255,255,255,0.3);font-family:'Rajdhani',sans-serif;letter-spacing:1px;">SESSION</span><span style="font-size:11px;color:rgba(0,229,255,0.6);font-family:'Orbitron',monospace;letter-spacing:1px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${sessionId}</span>`;
+  body.appendChild(sesRow);
+
+  // URL download row
   const addRow=document.createElement('div');
   const curUrl=(()=>{const s=tabState[activeTabId];return(s&&s.url&&s.url!=='ep://home'&&s.url!=='mims://portal')?s.url:'';})();
   addRow.innerHTML=`
-    <div class="panel-section-title">Simulate Download</div>
+    <div class="panel-section-title">Download from URL</div>
     <div class="panel-input-row">
       <input class="panel-input" id="dl-add-url" placeholder="https://example.com/file.zip" autocomplete="off" value="${curUrl}">
-      <button class="panel-btn" id="dl-add-btn" title="Start download">⬇</button>
+      <button class="panel-btn" id="dl-add-btn" title="Download">⬇</button>
+    </div>
+    <div class="panel-section-title" style="margin-top:12px;">Upload &amp; Save File</div>
+    <div class="panel-input-row">
+      <label id="dl-file-label" class="panel-btn" style="cursor:pointer;flex:1;text-align:center;justify-content:center;">📂 Choose File</label>
+      <input type="file" id="dl-file-input" style="display:none;" multiple>
     </div>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin:12px 0;">
   `;
   body.appendChild(addRow);
+
   document.getElementById('dl-add-btn').addEventListener('click',()=>{
     const url=document.getElementById('dl-add-url').value.trim();
     if(!url){showToast('Enter a URL');return;}
-    addDownload(url);
+    addDownloadFromUrl(url);
     document.getElementById('dl-add-url').value='';
   });
+
+  // File upload handler — reads file into session memory and offers real save
+  document.getElementById('dl-file-input').addEventListener('change', e=>{
+    Array.from(e.target.files).forEach(file=>{
+      const reader=new FileReader();
+      reader.onload=ev=>{
+        const blobUrl=URL.createObjectURL(file);
+        const dl={
+          id:nextDlId++, name:file.name,
+          url:blobUrl, blobUrl,
+          size:formatSize(file.size),
+          progress:100, status:'done',
+          time:Date.now(), source:'upload',
+          type:file.type
+        };
+        downloads.push(dl); saveDownloads(); renderDownloadsPanel(); updateDlBadge();
+        showToast(`📂 "${file.name}" saved to session`);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+    e.target.value='';
+  });
+  document.getElementById('dl-file-label').addEventListener('click',()=>{
+    document.getElementById('dl-file-input').click();
+  });
+
   if(downloads.length===0){
     const empty=document.createElement('div');
     empty.className='panel-empty';
     empty.innerHTML='<span class="pe-icon">⬇️</span>No downloads yet';
-    body.appendChild(empty);return;
+    body.appendChild(empty); return;
   }
-  // Clear all button
+
   const clearRow=document.createElement('div');
   clearRow.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
-  clearRow.innerHTML=`<div class="panel-section-title" style="margin:0;border:none;">History (${downloads.length})</div><div style="font-size:11px;color:rgba(255,100,100,0.7);cursor:pointer;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,100,100,0.2);" id="dl-clear-all">Clear all</div>`;
+  clearRow.innerHTML=`<div class="panel-section-title" style="margin:0;border:none;">This Session (${downloads.length})</div><div style="font-size:11px;color:rgba(255,100,100,0.7);cursor:pointer;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,100,100,0.2);" id="dl-clear-all">Clear all</div>`;
   body.appendChild(clearRow);
-  document.getElementById('dl-clear-all').addEventListener('click',()=>{downloads=[];saveDownloads();renderDownloadsPanel();updateDlBadge();showToast('Downloads cleared');});
-  const typeColors={'pdf':'#f44336','zip':'#ff9800','mp4':'#9c27b0','mp3':'#2196f3','exe':'#607d8b','png':'#4caf50','jpg':'#4caf50','gif':'#00bcd4','doc':'#1976d2','xls':'#388e3c'};
-  const typeIcons={'pdf':'📄','zip':'🗜️','mp4':'🎬','mp3':'🎵','exe':'⚙️','png':'🖼️','jpg':'🖼️','gif':'🖼️','doc':'📝','xls':'📊'};
+  document.getElementById('dl-clear-all').addEventListener('click',()=>{
+    downloads.forEach(d=>{ if(d.blobUrl) try{URL.revokeObjectURL(d.blobUrl);}catch{} });
+    downloads=[]; saveDownloads(); renderDownloadsPanel(); updateDlBadge();
+    showToast('Downloads cleared');
+  });
+
+  const typeColors={'pdf':'#f44336','zip':'#ff9800','mp4':'#9c27b0','mp3':'#2196f3','exe':'#607d8b','png':'#4caf50','jpg':'#4caf50','jpeg':'#4caf50','gif':'#00bcd4','doc':'#1976d2','docx':'#1976d2','xls':'#388e3c','xlsx':'#388e3c','crx':'#ff6d00','js':'#f9a825','css':'#0288d1','html':'#e64a19','txt':'#546e7a'};
+  const typeIcons={'pdf':'📄','zip':'🗜️','mp4':'🎬','mp3':'🎵','exe':'⚙️','png':'🖼️','jpg':'🖼️','jpeg':'🖼️','gif':'🖼️','doc':'📝','docx':'📝','xls':'📊','xlsx':'📊','crx':'🧩','js':'📜','css':'🎨','html':'🌐','txt':'📋'};
+
   [...downloads].reverse().forEach(dl=>{
     const el=document.createElement('div');
     el.className='dl-item';
-    const ext=(dl.name||'').split('.').pop().toLowerCase();
-    const icon=typeIcons[ext]||'📎';
-    const color=typeColors[ext]||'#78909c';
+    const extName=(dl.name||'').split('.').pop().toLowerCase();
+    const icon=typeIcons[extName]||'📎';
+    const color=typeColors[extName]||'#78909c';
     const pct=dl.progress||0;
     const statusColor=dl.status==='done'?'#4caf50':dl.status==='error'?'#f44336':'var(--cyan)';
+    const sourceTag=dl.source==='upload'?`<span style="font-size:9px;background:rgba(0,229,255,0.12);color:rgba(0,229,255,0.7);padding:1px 5px;border-radius:3px;margin-left:4px;">UPLOADED</span>`:'';
     el.innerHTML=`
       <div class="dl-icon" style="font-size:20px;width:36px;height:36px;border-radius:8px;background:${color}22;border:1px solid ${color}44;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${icon}</div>
       <div class="dl-info">
-        <div class="dl-name">${dl.name||'Unknown file'}</div>
-        <div class="dl-meta" style="color:${statusColor};">${dl.status==='done'?'✓ Complete':dl.status==='error'?'✗ Failed':`${pct}% · downloading`} ${dl.size&&dl.size!=='?'?'· '+dl.size:''}</div>
+        <div class="dl-name">${dl.name||'Unknown file'}${sourceTag}</div>
+        <div class="dl-meta" style="color:${statusColor};">${dl.status==='done'?'✓ Saved':dl.status==='error'?'✗ Failed':`${pct}% · downloading`} ${dl.size&&dl.size!=='?'?'· '+dl.size:''}</div>
         ${dl.status==='downloading'?`<div class="dl-bar"><div class="dl-bar-fill" style="width:${pct}%;background:${color};"></div></div>`:''}
       </div>
       <div class="dl-actions">
-        ${dl.status==='done'?`<div class="dl-btn" title="Open" onclick="window.open('${dl.url}','_blank')">🔗</div>`:''}
+        ${dl.status==='done'&&dl.blobUrl?`<div class="dl-btn" title="Save to device" id="dl-save-${dl.id}">💾</div>`:''}
+        ${dl.status==='done'&&dl.url&&!dl.blobUrl?`<div class="dl-btn" title="Open" onclick="window.open('${dl.url}','_blank')">🔗</div>`:''}
         <div class="dl-btn" title="Remove" onclick="removeDownload(${dl.id})">✕</div>
       </div>
     `;
     body.appendChild(el);
+    // Wire save-to-device button
+    if(dl.blobUrl){
+      const saveBtn=document.getElementById(`dl-save-${dl.id}`);
+      if(saveBtn) saveBtn.addEventListener('click',()=>{
+        const a=document.createElement('a');
+        a.href=dl.blobUrl; a.download=dl.name; a.click();
+        showToast(`💾 Saving "${dl.name}"…`);
+      });
+    }
   });
 }
 
-function addDownload(url){
+function formatSize(bytes){
+  if(bytes<1024) return bytes+'B';
+  if(bytes<1024*1024) return (bytes/1024).toFixed(1)+'KB';
+  return (bytes/1024/1024).toFixed(1)+'MB';
+}
+
+function addDownloadFromUrl(url){
   let name; try{name=decodeURIComponent(new URL(url).pathname.split('/').pop())||'file';}catch{name='file';}
-  const dl={id:nextDlId++,name,url,size:'?',progress:0,status:'downloading'};
-  downloads.push(dl);saveDownloads();renderDownloadsPanel();updateDlBadge();
-  // Simulate progress
-  let pct=0;
-  const iv=setInterval(()=>{
-    pct+=Math.random()*15+5;
-    if(pct>=100){pct=100;dl.progress=100;dl.status='done';dl.size=Math.floor(Math.random()*50+1)+'MB';clearInterval(iv);}
-    else dl.progress=Math.floor(pct);
-    saveDownloads();renderDownloadsPanel();updateDlBadge();
-  },400);
-  showToast(`Downloading: ${name}`);
+  if(!name||name==='') name='download';
+  const dl={id:nextDlId++,name,url,size:'?',progress:0,status:'downloading',time:Date.now(),source:'url'};
+  downloads.push(dl); saveDownloads(); renderDownloadsPanel(); updateDlBadge();
+  // Attempt real fetch into a Blob for actual saving
+  fetch(url, {mode:'cors'}).then(r=>{
+    if(!r.ok) throw new Error('fetch failed');
+    const total=parseInt(r.headers.get('content-length')||'0');
+    const reader=r.body.getReader();
+    let received=0; const chunks=[];
+    function pump(){
+      return reader.read().then(({done,value})=>{
+        if(done){
+          const blob=new Blob(chunks, {type:r.headers.get('content-type')||'application/octet-stream'});
+          const blobUrl=URL.createObjectURL(blob);
+          dl.blobUrl=blobUrl; dl.progress=100; dl.status='done';
+          dl.size=formatSize(blob.size);
+          saveDownloads(); renderDownloadsPanel(); updateDlBadge();
+          showToast(`✓ "${dl.name}" ready to save`);
+          return;
+        }
+        chunks.push(value); received+=value.length;
+        if(total>0) dl.progress=Math.round(received/total*100);
+        else dl.progress=Math.min(99, dl.progress+5);
+        saveDownloads(); renderDownloadsPanel(); updateDlBadge();
+        return pump();
+      });
+    }
+    return pump();
+  }).catch(()=>{
+    // CORS block or network error — fall back to simulated progress + open link
+    let pct=0;
+    const iv=setInterval(()=>{
+      pct+=Math.random()*15+5;
+      if(pct>=100){
+        pct=100; dl.progress=100; dl.status='done';
+        dl.size=Math.floor(Math.random()*50+1)+'MB';
+        clearInterval(iv);
+      } else dl.progress=Math.floor(pct);
+      saveDownloads(); renderDownloadsPanel(); updateDlBadge();
+    },400);
+  });
+  showToast(`⬇ Downloading: ${name}`);
   openPanel('downloads');
 }
 
 function removeDownload(id){
+  const dl=downloads.find(d=>d.id===id);
+  if(dl&&dl.blobUrl) try{URL.revokeObjectURL(dl.blobUrl);}catch{}
   downloads=downloads.filter(d=>d.id!==id);
-  saveDownloads();renderDownloadsPanel();updateDlBadge();
+  saveDownloads(); renderDownloadsPanel(); updateDlBadge();
 }
 
 // ═══════════════════════════════════════════
@@ -1285,183 +1860,646 @@ let extensions=JSON.parse(localStorage.getItem('ep_extensions')||'null')||[
 let nextExtId=Math.max(...extensions.map(e=>e.id))+1;
 function saveExtensions(){localStorage.setItem('ep_extensions',JSON.stringify(extensions));}
 
+// ═══════════════════════════════════════════
+//  THEMES PANEL
+// ═══════════════════════════════════════════
+function renderThemesPanel(){
+  const body=document.getElementById('themes-body');
+  if(!body)return;
+  body.innerHTML='';
+
+  const THEMES=[
+    {id:'night',   label:'Night',       icon:'🌙', active:()=>!summerEnabled&&!winterEnabled&&!fallEnabled&&!springEnabled&&!sandEnabled&&!radioactiveEnabled&&!thunderEnabled&&!grassEnabled},
+    {id:'summer',  label:'Summer',      icon:'☀️', active:()=>summerEnabled},
+    {id:'winter',  label:'Winter',      icon:'❄️', active:()=>winterEnabled},
+    {id:'fall',    label:'Fall',        icon:'🍂', active:()=>fallEnabled},
+    {id:'spring',  label:'Spring',      icon:'🌸', active:()=>springEnabled},
+    {id:'sand',    label:'Sand City',   icon:'⚡', active:()=>sandEnabled},
+    {id:'radioactive',label:'Radioactive',icon:'☢️',active:()=>radioactiveEnabled},
+    {id:'thunder', label:'Thunder',     icon:'⛈️', active:()=>thunderEnabled},
+    {id:'grass',   label:'Grass City',  icon:'🌿', active:()=>grassEnabled},
+  ];
+
+  // Smart Season toggle at top
+  const ssRow=document.createElement('div');
+  ssRow.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 4px 14px;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:14px;';
+  ssRow.innerHTML=`
+    <div>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;color:${seasonalMode?'#b090f0':'rgba(255,255,255,0.7)'};">📅 Smart Season</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;">Auto-match real-world season</div>
+    </div>
+    <div class="ext-toggle${seasonalMode?' on':''}" id="themes-seasonal-toggle" style="${seasonalMode?'background:#9060e0':''}"></div>
+  `;
+  body.appendChild(ssRow);
+  document.getElementById('themes-seasonal-toggle')?.addEventListener('click',()=>{
+    seasonalMode=!seasonalMode;
+    localStorage.setItem('ep_seasonal',seasonalMode?'1':'0');
+    if(seasonalMode){applySeasonalMode();applySeasonTheme();const s=getSeasonFromDate();showToast(`📅 Smart Season on — it's ${s.charAt(0).toUpperCase()+s.slice(1)}!`);}
+    else showToast('📅 Smart Season off');
+    renderThemesPanel();
+  });
+
+  const grid=document.createElement('div');
+  grid.className='theme-grid-panel';
+  body.appendChild(grid);
+
+  THEMES.forEach(t=>{
+    const isActive=t.active();
+    const btn=document.createElement('div');
+    btn.className='theme-btn-large'+(isActive?' active':'');
+    btn.innerHTML=`<span class="theme-icon">${t.icon}</span><span>${t.label}</span>`;
+    btn.addEventListener('click',()=>{
+      _activateTheme(t.id);
+      renderThemesPanel();
+      // Also refresh extensions panel if open
+      if(activePanel==='extensions') renderExtensionsPanel();
+    });
+    grid.appendChild(btn);
+  });
+
+  // Particles toggle
+  const partRow=document.createElement('div');
+  partRow.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:14px 4px 6px;border-top:1px solid rgba(255,255,255,0.06);margin-top:14px;';
+  const activeSeason=summerEnabled?'summer':winterEnabled?'winter':fallEnabled?'fall':springEnabled?'spring':sandEnabled?'sand':radioactiveEnabled?'radioactive':thunderEnabled?'thunder':grassEnabled?'grass':'night';
+  const particleLabel={night:'🌧️ Rain',summer:'🐦 Birds',winter:'❄️ Snowflakes',fall:'🍂 Leaves',spring:'🌸 Petals',sand:'⚡ Sandstorm',radioactive:'☢️ Toxic Smoke',thunder:'⛈️ Storm Rain',grass:'🦋 Butterflies'}[activeSeason];
+  partRow.innerHTML=`
+    <div>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;color:rgba(255,255,255,0.7);">${particleLabel}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;">Scene particles</div>
+    </div>
+    <div class="ext-toggle${particlesEnabled?' on':''}" id="themes-particles-toggle"></div>
+  `;
+  body.appendChild(partRow);
+  document.getElementById('themes-particles-toggle')?.addEventListener('click',()=>{
+    particlesEnabled=!particlesEnabled;
+    localStorage.setItem('ep_particles',particlesEnabled?'1':'0');
+    renderThemesPanel();
+    showToast(particlesEnabled?`${particleLabel} enabled`:`${particleLabel} disabled`);
+  });
+
+  // Window animations toggle
+  const winRow=document.createElement('div');
+  winRow.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 4px 4px;';
+  winRow.innerHTML=`
+    <div>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;color:rgba(255,255,255,0.7);">🪟 Window Animations</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;">Disable for better performance</div>
+    </div>
+    <div class="ext-toggle${windowAnimations?' on':''}" id="themes-winanim-toggle"></div>
+  `;
+  body.appendChild(winRow);
+  document.getElementById('themes-winanim-toggle')?.addEventListener('click',()=>{
+    windowAnimations=!windowAnimations;
+    localStorage.setItem('ep_winanim',windowAnimations?'1':'0');
+    // Update windows arrays in-place — no need to rebuild the whole city
+    buildings.forEach((b,bi)=>{
+      b.windows = windowAnimations ? genWins(b.w, b.h, bi) : [];
+    });
+    renderThemesPanel();
+    showToast(windowAnimations?'🪟 Window animations on':'🪟 Window animations off (faster)');
+  });
+}
+
+// Helper used by both themes panel and any legacy calls
+function _activateTheme(which){
+  summerEnabled=which==='summer'; winterEnabled=which==='winter';
+  fallEnabled=which==='fall'; springEnabled=which==='spring';
+  sandEnabled=which==='sand'; radioactiveEnabled=which==='radioactive';
+  thunderEnabled=which==='thunder'; grassEnabled=which==='grass';
+  // 'night' leaves all false
+  seasonalMode=false; localStorage.setItem('ep_seasonal','0');
+  localStorage.setItem('ep_summer',summerEnabled?'1':'0');
+  localStorage.setItem('ep_winter',winterEnabled?'1':'0');
+  localStorage.setItem('ep_fall',fallEnabled?'1':'0');
+  localStorage.setItem('ep_spring',springEnabled?'1':'0');
+  localStorage.setItem('ep_sand',sandEnabled?'1':'0');
+  localStorage.setItem('ep_radioactive',radioactiveEnabled?'1':'0');
+  localStorage.setItem('ep_thunder',thunderEnabled?'1':'0');
+  localStorage.setItem('ep_grass',grassEnabled?'1':'0');
+  applySeasonTheme();
+  const names={night:'🌙 Night City',summer:'☀️ Summer City',winter:'❄️ Winter City',fall:'🍂 Fall City',spring:'🌸 Spring City',sand:'⚡ Sand City',radioactive:'☢️ Radioactive City',thunder:'⛈️ Thunder City',grass:'🌿 Grass City'};
+  showToast(names[which]||'Theme applied');
+}
+
 function renderExtensionsPanel(){
   const body=document.getElementById('extensions-body');
   if(!body)return;
   body.innerHTML='';
 
   // ── Visual Effects section ──
-  const effectsSection=document.createElement('div');
-  const activeSeason=summerEnabled?'summer':winterEnabled?'winter':fallEnabled?'fall':springEnabled?'spring':sandEnabled?'sand':radioactiveEnabled?'radioactive':'night';
-  const particleLabel={night:'🌧️ Rain',summer:'🐦 Birds',winter:'❄️ Snowflakes',fall:'🍂 Falling Leaves',spring:'🌸 Petals & Butterflies',sand:'⚡ Sandstorm & Lightning',radioactive:'☢️ Toxic Smoke & Lightning'}[activeSeason];
-  const particleDesc={night:'Animated rain on the night cityscape.',summer:'Seagulls soaring across the summer sky.',winter:'Snowflakes and decorative snow crystals.',fall:'Falling autumn leaves swirling in the breeze.',spring:'Cherry blossom petals, leaves and butterflies.',sand:'Swirling sand grains and lightning strikes.',radioactive:'Rising toxic fog particles and neon lightning.'}[activeSeason];
-  const sCard=(on,r,g,b)=>on?`rgba(${r},${g},${b},0.1)`:`rgba(255,255,255,0.04)`;
-  const sBdr=(on,r,g,b)=>on?`rgba(${r},${g},${b},0.32)`:`rgba(255,255,255,0.07)`;
-  const curSeason=getSeasonFromDate();
-  const curSeasonLabel=curSeason.charAt(0).toUpperCase()+curSeason.slice(1);
-  effectsSection.innerHTML=`
-    <div class="panel-section-title">Scenes</div>
-    <div class="ext-item" style="align-items:center;margin-bottom:4px;background:${sCard(summerEnabled,200,130,10)};border-color:${sBdr(summerEnabled,200,130,10)};">
-      <div class="ext-icon">☀️</div>
-      <div class="ext-info">
-        <div class="ext-name" style="${summerEnabled?'color:#8a5200':''}">Summer City</div>
-        <div class="ext-desc">Golden sun, drifting clouds &amp; birds. Light warm UI.</div>
-      </div>
-      <div class="ext-toggle${summerEnabled?' on':''}" id="summer-toggle" style="${summerEnabled?'background:#d4820a':''}"></div>
-    </div>
-    <div class="ext-item" style="align-items:center;margin-bottom:4px;background:${sCard(fallEnabled,200,96,26)};border-color:${sBdr(fallEnabled,200,96,26)};">
-      <div class="ext-icon">🍂</div>
-      <div class="ext-info">
-        <div class="ext-name" style="${fallEnabled?'color:#d4720a':''}">Fall City</div>
-        <div class="ext-desc">Dusk god-rays &amp; warm amber windows. Cozy dark UI.</div>
-      </div>
-      <div class="ext-toggle${fallEnabled?' on':''}" id="fall-toggle" style="${fallEnabled?'background:#c8601a':''}"></div>
-    </div>
-    <div class="ext-item" style="align-items:center;margin-bottom:4px;background:${sCard(winterEnabled,168,216,240)};border-color:${sBdr(winterEnabled,168,216,240)};">
-      <div class="ext-icon">❄️</div>
-      <div class="ext-info">
-        <div class="ext-name" style="${winterEnabled?'color:#a8d8f0':''}">Winter City</div>
-        <div class="ext-desc">Moonlit snowscape, icicles &amp; aurora. Cold blue UI.</div>
-      </div>
-      <div class="ext-toggle${winterEnabled?' on':''}" id="winter-toggle" style="${winterEnabled?'background:#a8d8f0':''}"></div>
-    </div>
-    <div class="ext-item" style="align-items:center;margin-bottom:4px;background:${sCard(springEnabled,58,170,90)};border-color:${sBdr(springEnabled,58,170,90)};">
-      <div class="ext-icon">🌸</div>
-      <div class="ext-info">
-        <div class="ext-name" style="${springEnabled?'color:#1a7a38':''}">Spring City</div>
-        <div class="ext-desc">Bright sky, blooming rooftops, butterflies &amp; petals.</div>
-      </div>
-      <div class="ext-toggle${springEnabled?' on':''}" id="spring-toggle" style="${springEnabled?'background:#3aaa5a':''}"></div>
-    </div>
-    <div class="ext-item" style="align-items:center;margin-bottom:4px;background:${sCard(sandEnabled,139,94,26)};border-color:${sBdr(sandEnabled,139,94,26)};">
-      <div class="ext-icon">⚡</div>
-      <div class="ext-info">
-        <div class="ext-name" style="${sandEnabled?'color:#8B5E1A':''}">Sand City</div>
-        <div class="ext-desc">Dusty ochre storm, swirling grains &amp; lightning strikes.</div>
-      </div>
-      <div class="ext-toggle${sandEnabled?' on':''}" id="sand-toggle" style="${sandEnabled?'background:#8B5E1A':''}"></div>
-    </div>
-    <div class="ext-item" style="align-items:center;margin-bottom:4px;background:${sCard(radioactiveEnabled,57,255,20)};border-color:${sBdr(radioactiveEnabled,57,255,20)};">
-      <div class="ext-icon">☢️</div>
-      <div class="ext-info">
-        <div class="ext-name" style="${radioactiveEnabled?'color:#39ff14':''}">Radioactive City</div>
-        <div class="ext-desc">Toxic green fog, glowing ruins &amp; neon lightning.</div>
-      </div>
-      <div class="ext-toggle${radioactiveEnabled?' on':''}" id="radioactive-toggle" style="${radioactiveEnabled?'background:#39ff14':''}"></div>
-    </div>
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin:12px 0;">
-    <div class="panel-section-title">Animations</div>
-    <div class="ext-item" style="align-items:center;margin-bottom:4px;">
-      <div class="ext-icon">${{night:'🌧️',summer:'🐦',winter:'❄️',fall:'🍂',spring:'🌸',sand:'⚡',radioactive:'☢️'}[activeSeason]}</div>
-      <div class="ext-info">
-        <div class="ext-name">${particleLabel}</div>
-        <div class="ext-desc">${particleDesc}</div>
-      </div>
-      <div class="ext-toggle${particlesEnabled?' on':''}" id="particles-toggle"></div>
-    </div>
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin:12px 0;">
-    <div class="panel-section-title">Smart Season</div>
-    <div class="ext-item" style="align-items:center;background:${seasonalMode?'rgba(120,80,220,0.1)':'rgba(255,255,255,0.04)'};border-color:${seasonalMode?'rgba(140,100,240,0.35)':'rgba(255,255,255,0.07)'};">
-      <div class="ext-icon">📅</div>
-      <div class="ext-info">
-        <div class="ext-name" style="${seasonalMode?'color:#b090f0':''}">Seasonal Mode</div>
-        <div class="ext-desc">Auto-sets scene to today's real-world season. Now: <strong style="${seasonalMode?'color:#c0a8ff':''}">${curSeasonLabel}</strong></div>
-      </div>
-      <div class="ext-toggle${seasonalMode?' on':''}" id="seasonal-toggle" style="${seasonalMode?'background:#9060e0':''}"></div>
-    </div>
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin:14px 0;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <div class="panel-section-title" style="margin:0;border:none;">Installed Extensions (${extensions.length})</div>
-      <div style="display:flex;gap:6px;">
-        <div style="font-size:10px;color:rgba(0,229,255,0.7);cursor:pointer;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,229,255,0.2);" id="ext-enable-all">Enable all</div>
-        <div style="font-size:10px;color:rgba(255,255,255,0.4);cursor:pointer;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.1);" id="ext-disable-all">Disable all</div>
-      </div>
-    </div>
-  `;
-  body.appendChild(effectsSection);
-
-  function _activateSeason(which){
-    summerEnabled=which==='summer'; winterEnabled=which==='winter';
-    fallEnabled=which==='fall'; springEnabled=which==='spring';
-    sandEnabled=which==='sand'; radioactiveEnabled=which==='radioactive';
-    if(which!=='auto'){ seasonalMode=false; localStorage.setItem('ep_seasonal','0'); }
-    localStorage.setItem('ep_summer',summerEnabled?'1':'0');
-    localStorage.setItem('ep_winter',winterEnabled?'1':'0');
-    localStorage.setItem('ep_fall',fallEnabled?'1':'0');
-    localStorage.setItem('ep_spring',springEnabled?'1':'0');
-    localStorage.setItem('ep_sand',sandEnabled?'1':'0');
-    localStorage.setItem('ep_radioactive',radioactiveEnabled?'1':'0');
-    applySeasonTheme(); renderExtensionsPanel();
-  }
-  const _st=document.getElementById('summer-toggle');
-  if(_st)_st.addEventListener('click',()=>{ _activateSeason(summerEnabled?'night':'summer'); showToast(summerEnabled?'☀️ Summer City activated!':'🌙 Night City restored'); });
-  const _ft=document.getElementById('fall-toggle');
-  if(_ft)_ft.addEventListener('click',()=>{ _activateSeason(fallEnabled?'night':'fall'); showToast(fallEnabled?'🍂 Fall City activated!':'🌙 Night City restored'); });
-  const _wt=document.getElementById('winter-toggle');
-  if(_wt)_wt.addEventListener('click',()=>{ _activateSeason(winterEnabled?'night':'winter'); showToast(winterEnabled?'❄️ Winter City activated!':'🌙 Night City restored'); });
-  const _spt=document.getElementById('spring-toggle');
-  if(_spt)_spt.addEventListener('click',()=>{ _activateSeason(springEnabled?'night':'spring'); showToast(springEnabled?'🌸 Spring City activated!':'🌙 Night City restored'); });
-  const _sdt=document.getElementById('sand-toggle');
-  if(_sdt)_sdt.addEventListener('click',()=>{ _activateSeason(sandEnabled?'night':'sand'); showToast(sandEnabled?'⚡ Sand City activated!':'🌙 Night City restored'); });
-  const _rdt=document.getElementById('radioactive-toggle');
-  if(_rdt)_rdt.addEventListener('click',()=>{ _activateSeason(radioactiveEnabled?'night':'radioactive'); showToast(radioactiveEnabled?'☢️ Radioactive City activated!':'🌙 Night City restored'); });
-
-  const _ptt=document.getElementById('particles-toggle');
-  if(_ptt)_ptt.addEventListener('click',()=>{
-    particlesEnabled=!particlesEnabled;
-    localStorage.setItem('ep_particles',particlesEnabled?'1':'0');
-    document.getElementById('particles-toggle').classList.toggle('on',particlesEnabled);
-    showToast(particlesEnabled?`${particleLabel} enabled`:`${particleLabel} disabled`);
-  });
-
-  const _seaT=document.getElementById('seasonal-toggle');
-  if(_seaT)_seaT.addEventListener('click',()=>{
-    seasonalMode=!seasonalMode;
-    localStorage.setItem('ep_seasonal',seasonalMode?'1':'0');
-    if(seasonalMode){ applySeasonalMode(); applySeasonTheme(); const s=getSeasonFromDate(); showToast(`📅 Seasonal Mode on — it's ${s.charAt(0).toUpperCase()+s.slice(1)}!`); }
-    else showToast('📅 Seasonal Mode off');
-    renderExtensionsPanel();
-  });
 
   const _eea=document.getElementById('ext-enable-all');
   if(_eea)_eea.addEventListener('click',()=>{extensions.forEach(e=>e.enabled=true);saveExtensions();renderExtensionsPanel();showToast('All extensions enabled');});
   const _eda=document.getElementById('ext-disable-all');
   if(_eda)_eda.addEventListener('click',()=>{extensions.forEach(e=>e.enabled=false);saveExtensions();renderExtensionsPanel();showToast('All extensions disabled');});
-  // Add custom extension
+  // Install Extension — file upload, CWS link, or generic URL
   const addRow=document.createElement('div');
   addRow.innerHTML=`
-    <div class="panel-section-title" style="margin-top:8px;">Add Extension</div>
-    <div class="panel-input-row">
-      <input class="panel-input" id="ext-add-name" placeholder="Extension name" autocomplete="off">
-      <button class="panel-btn" id="ext-add-btn">Add</button>
+    <div class="panel-section-title" style="margin-top:8px;">Install Extension</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px;">
+      <input class="panel-input" id="ext-add-name" placeholder="Name (optional)" autocomplete="off" style="flex:1;">
+    </div>
+    <div class="panel-input-row" style="margin-bottom:6px;">
+      <input class="panel-input" id="ext-cws-url" placeholder="Chrome Web Store or script URL" autocomplete="off" style="flex:1;">
+      <button class="panel-btn" id="ext-add-url-btn" title="Install from URL">🔗</button>
+    </div>
+    <div class="panel-input-row" style="margin-bottom:6px;">
+      <label id="ext-file-label" class="panel-btn" style="cursor:pointer;flex:1;text-align:center;justify-content:center;">📂 Upload .js / .crx / .zip</label>
+      <input type="file" id="ext-file-input" style="display:none;" accept=".js,.crx,.zip,.json">
     </div>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin:12px 0;">
   `;
   body.appendChild(addRow);
-  document.getElementById('ext-add-btn').addEventListener('click',()=>{
-    const name=document.getElementById('ext-add-name').value.trim();
-    if(!name){showToast('Enter a name');return;}
-    extensions.push({id:nextExtId++,name,icon:'🧩',desc:'Custom extension',enabled:true,version:'1.0.0'});
+
+  document.getElementById('ext-add-url-btn').addEventListener('click',()=>{
+    const rawUrl=document.getElementById('ext-cws-url').value.trim();
+    const customName=document.getElementById('ext-add-name').value.trim();
+    if(!rawUrl){showToast('Enter a URL');return;}
+    const cwsMatch=rawUrl.match(/chromewebstore\.google\.com\/detail\/([^\/]+)\/([a-z]+)/)||
+                   rawUrl.match(/chrome\.google\.com\/webstore\/detail\/([^\/]+)\/([a-z]+)/);
+    if(cwsMatch){
+      const extSlug=cwsMatch[1].replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+      const extId=cwsMatch[2];
+      const name=customName||extSlug||'CWS Extension';
+      showToast(`\u23f3 Fetching "${name}" from CWS\u2026`);
+      installCWSExtension(extId, name, rawUrl);
+      document.getElementById('ext-cws-url').value='';
+      document.getElementById('ext-add-name').value='';
+      return;
+    }
+    let guessName=customName;
+    if(!guessName){try{guessName=decodeURIComponent(new URL(rawUrl).pathname.split('/').pop()).replace(/\.(js|crx|zip)$/i,'')||'Extension';}catch{guessName='Extension';}}
+    extensions.push({id:nextExtId++,name:guessName,icon:'\U0001f9e9',desc:`From: ${rawUrl.length>50?rawUrl.slice(0,50)+'\u2026':rawUrl}`,enabled:true,version:'1.0.0',source:'url',url:rawUrl,sessionId});
     saveExtensions();renderExtensionsPanel();
-    showToast(`"${name}" added`);
+    showToast(`\U0001f9e9 "${guessName}" installed`);
+    document.getElementById('ext-cws-url').value='';
+    document.getElementById('ext-add-name').value='';
   });
+  document.getElementById('ext-file-input').addEventListener('change',e=>{
+    Array.from(e.target.files).forEach(file=>{
+      const customName=document.getElementById('ext-add-name').value.trim();
+      const baseName=file.name.replace(/\.(js|crx|zip|json)$/i,'');
+      const name=customName||baseName||file.name;
+      const extType=file.name.split('.').pop().toLowerCase();
+      const icon=extType==='crx'?'🧩':extType==='js'?'📜':extType==='zip'?'🗜️':'🧩';
+      const reader=new FileReader();
+      reader.onload=()=>{
+        if(extType==='crx'||extType==='zip'){
+          // Unpack CRX/ZIP and extract content scripts
+          unpackCRXBlob(file.arrayBuffer(), file, name, icon);
+        } else {
+          const blobUrl=URL.createObjectURL(file);
+          extensions.push({id:nextExtId++,name,icon,desc:`Uploaded: ${file.name} (${formatSize(file.size)})`,enabled:true,version:'1.0.0',source:'file',fileName:file.name,blobUrl,sessionId});
+          saveExtensions();renderExtensionsPanel();
+          showToast(`${icon} "${name}" installed from file`);
+        }
+        document.getElementById('ext-add-name').value='';
+      };
+      reader.readAsArrayBuffer(file);
+    });
+    e.target.value='';
+  });
+  document.getElementById('ext-file-label').addEventListener('click',()=>document.getElementById('ext-file-input').click());
+
   extensions.forEach(ext=>{
     const el=document.createElement('div');
     el.className='ext-item';
+    const srcBadge=ext.source==='cws'?'<span style="font-size:9px;background:rgba(66,133,244,0.18);color:rgba(100,160,255,0.8);padding:1px 5px;border-radius:3px;margin-left:4px;">CWS</span>':ext.source==='file'?'<span style="font-size:9px;background:rgba(0,229,255,0.12);color:rgba(0,229,255,0.7);padding:1px 5px;border-radius:3px;margin-left:4px;">FILE</span>':ext.source==='url'?'<span style="font-size:9px;background:rgba(255,180,0,0.12);color:rgba(255,180,0,0.7);padding:1px 5px;border-radius:3px;margin-left:4px;">URL</span>':''
     el.innerHTML=`
       <div class="ext-icon">${ext.icon}</div>
       <div class="ext-info">
-        <div class="ext-name">${ext.name} <span style="font-size:10px;color:rgba(255,255,255,0.25);font-weight:400;">v${ext.version}</span></div>
+        <div class="ext-name">${ext.name}${srcBadge} <span style="font-size:10px;color:rgba(255,255,255,0.25);font-weight:400;">v${ext.version}</span></div>
         <div class="ext-desc">${ext.desc}</div>
         <div class="ext-actions">
           <div class="ext-action-btn" onclick="removeExt(${ext.id})">Remove</div>
-          <div class="ext-action-btn" onclick="showToast('Extension details')">Details</div>
+          ${ext.blobUrl?`<div class="ext-action-btn" id="ext-save-${ext.id}">Save File</div>`:''}
+          ${ext.url&&!ext.blobUrl?`<div class="ext-action-btn" onclick="window.open('${ext.url}','_blank')">View</div>`:''}
         </div>
       </div>
       <div class="ext-toggle${ext.enabled?' on':''}" id="ext-toggle-${ext.id}" onclick="toggleExt(${ext.id})"></div>
     `;
     body.appendChild(el);
+    if(ext.blobUrl){
+      const sb=document.getElementById(`ext-save-${ext.id}`);
+      if(sb)sb.addEventListener('click',()=>{const a=document.createElement('a');a.href=ext.blobUrl;a.download=ext.fileName||ext.name;a.click();showToast('Saving…');});
+    }
   });
+}
+
+// ═══════════════════════════════════════════
+//  CWS / CRX INSTALLER
+// ═══════════════════════════════════════════
+
+// CORS proxies to try in order
+const CORS_PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://cors-anywhere.herokuapp.com/${url}`,
+];
+
+// CRX download URL template (Chrome's update endpoint)
+function crxDownloadUrl(extId) {
+  return `https://clients2.google.com/service/update2/crx?response=redirect&prodversion=109.0&x=id%3D${extId}%26installsource%3Dondemand%26uc`;
+}
+
+async function fetchWithProxy(url) {
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const r = await fetch(proxy(url), {cache:'no-store'});
+      if (r.ok) return r;
+    } catch {}
+  }
+  return null;
+}
+
+async function installCWSExtension(extId, name, storeUrl) {
+  // Register the extension immediately as loading
+  const ext = {
+    id: nextExtId++, name, icon: '🧩',
+    desc: `Chrome Web Store · ${extId.slice(0,12)}…`,
+    enabled: true, version: '?',
+    source: 'cws', cwsId: extId, url: storeUrl,
+    crxStatus: 'loading', contentScripts: [],
+    sessionId
+  };
+  extensions.push(ext);
+  saveExtensions(); renderExtensionsPanel();
+
+  try {
+    // Try fetching the CRX binary via CORS proxy
+    const crxUrl = crxDownloadUrl(extId);
+    const resp = await fetchWithProxy(crxUrl);
+
+    if (!resp) throw new Error('All CORS proxies failed');
+
+    const arrayBuf = await resp.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuf);
+
+    // CRX3 format: starts with "Cr24" magic bytes
+    // CRX3 has a variable-length header before the ZIP payload
+    // Find the ZIP by looking for the PK\x03\x04 magic
+    let zipOffset = 0;
+    for (let i = 0; i < Math.min(bytes.length - 4, 16384); i++) {
+      if (bytes[i]===0x50 && bytes[i+1]===0x4B && bytes[i+2]===0x03 && bytes[i+3]===0x04) {
+        zipOffset = i;
+        break;
+      }
+    }
+
+    const zipData = arrayBuf.slice(zipOffset);
+
+    // Use JSZip to unpack
+    if (typeof JSZip === 'undefined') throw new Error('JSZip not loaded');
+    const zip = await JSZip.loadAsync(zipData);
+
+    // Read manifest.json
+    const manifestFile = zip.file('manifest.json');
+    if (!manifestFile) throw new Error('No manifest.json in CRX');
+    const manifestText = await manifestFile.async('string');
+    const manifest = JSON.parse(manifestText);
+
+    ext.version = manifest.version || '?';
+    ext.desc = manifest.description
+      ? manifest.description.slice(0, 80) + (manifest.description.length > 80 ? '…' : '')
+      : `CWS · ${extId.slice(0,12)}…`;
+
+    // Extract content_scripts
+    const contentScripts = manifest.content_scripts || [];
+    const parsedCS = [];
+
+    for (const cs of contentScripts) {
+      const jsTexts = [];
+      const cssTexts = [];
+
+      for (const jsFile of (cs.js || [])) {
+        const f = zip.file(jsFile);
+        if (f) {
+          try { jsTexts.push(await f.async('string')); } catch {}
+        }
+      }
+      for (const cssFile of (cs.css || [])) {
+        const f = zip.file(cssFile);
+        if (f) {
+          try { cssTexts.push(await f.async('string')); } catch {}
+        }
+      }
+
+      parsedCS.push({
+        matches: cs.matches || [],
+        excludeMatches: cs.exclude_matches || [],
+        runAt: cs.run_at || 'document_end',
+        jsTexts,
+        cssTexts
+      });
+    }
+
+    ext.contentScripts = parsedCS;
+    ext.crxStatus = 'ready';
+
+    const totalScripts = parsedCS.reduce((n, cs) => n + cs.jsTexts.length + cs.cssTexts.length, 0);
+    showToast(`✅ "${name}" v${ext.version} ready — ${totalScripts} script(s) loaded`);
+
+  } catch (err) {
+    ext.crxStatus = 'failed';
+    ext.desc = `CRX fetch failed: ${err.message}`;
+    showToast(`⚠️ "${name}" — ${err.message}. Try uploading the .crx file directly.`);
+  }
+
+  saveExtensions(); renderExtensionsPanel();
+  // Inject into current page if it's open
+  injectIntoWebIframe();
+}
+
+async function unpackCRXBlob(arrayBufPromise, file, name, icon) {
+  const ext = {
+    id: nextExtId++, name, icon,
+    desc: `Unpacking ${file.name}…`,
+    enabled: true, version: '?',
+    source: 'crx-file', fileName: file.name,
+    crxStatus: 'loading', contentScripts: [],
+    sessionId
+  };
+  extensions.push(ext);
+  saveExtensions(); renderExtensionsPanel();
+
+  try {
+    const arrayBuf = await arrayBufPromise;
+    const bytes = new Uint8Array(arrayBuf);
+
+    // Find ZIP PK magic (handles both raw ZIP and CRX3 with header)
+    let zipOffset = 0;
+    for (let i = 0; i < Math.min(bytes.length - 4, 16384); i++) {
+      if (bytes[i]===0x50 && bytes[i+1]===0x4B && bytes[i+2]===0x03 && bytes[i+3]===0x04) {
+        zipOffset = i; break;
+      }
+    }
+
+    if (typeof JSZip === 'undefined') throw new Error('JSZip not loaded');
+    const zip = await JSZip.loadAsync(arrayBuf.slice(zipOffset));
+
+    const manifestFile = zip.file('manifest.json');
+    if (!manifestFile) throw new Error('No manifest.json found');
+    const manifest = JSON.parse(await manifestFile.async('string'));
+
+    ext.version = manifest.version || '?';
+    ext.desc = manifest.description
+      ? manifest.description.slice(0, 80)
+      : `Uploaded CRX · ${file.name}`;
+
+    const parsedCS = [];
+    for (const cs of (manifest.content_scripts || [])) {
+      const jsTexts = [], cssTexts = [];
+      for (const jsFile of (cs.js || [])) {
+        const f = zip.file(jsFile);
+        if (f) try { jsTexts.push(await f.async('string')); } catch {}
+      }
+      for (const cssFile of (cs.css || [])) {
+        const f = zip.file(cssFile);
+        if (f) try { cssTexts.push(await f.async('string')); } catch {}
+      }
+      parsedCS.push({ matches: cs.matches || [], excludeMatches: cs.exclude_matches || [], runAt: cs.run_at || 'document_end', jsTexts, cssTexts });
+    }
+
+    ext.contentScripts = parsedCS;
+    ext.crxStatus = 'ready';
+    const total = parsedCS.reduce((n, cs) => n + cs.jsTexts.length + cs.cssTexts.length, 0);
+    showToast(`✅ "${name}" v${ext.version} unpacked — ${total} script(s)`);
+  } catch(err) {
+    ext.crxStatus = 'failed';
+    ext.desc = `Unpack failed: ${err.message}`;
+    showToast(`⚠️ "${name}" — ${err.message}`);
+  }
+
+  saveExtensions(); renderExtensionsPanel();
+  injectIntoWebIframe();
+}
+
+// Convert a Chrome extension match pattern to a JS regex
+function matchPatternToRegex(pattern) {
+  if (pattern === '<all_urls>' || pattern === '*://*/*') return /.*/;
+  try {
+    // pattern format: scheme://host/path
+    const escaped = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // escape regex specials except * and ?
+      .replace(/\\\*/g, '.*')                  // * → .*
+      .replace(/\?/g, '.');
+    return new RegExp('^' + escaped + '$');
+  } catch {
+    return null;
+  }
+}
+
+function urlMatchesPatterns(url, patterns) {
+  if (!url || !patterns || patterns.length === 0) return false;
+  return patterns.some(p => {
+    const re = matchPatternToRegex(p);
+    return re && re.test(url);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  EXTENSION INJECTION ENGINE
+// ═══════════════════════════════════════════
+
+// Built-in userscript library — behaviours for the 6 default extensions
+const BUILTIN_SCRIPTS = {
+  1: `/* Ad Blocker Pro */
+(function(){
+  const SELECTORS=['[id*="ad"],[class*="ad-"],[class*="-ad"],[id*="banner"],[class*="banner"],[id*="sponsor"],[class*="sponsor"],[class*="advertisement"],[id*="advertisement"],[class*="popup"],[id*="popup"],[class*="overlay"][style*="position:fixed"],[class*="modal"][style*="position:fixed"]'];
+  function nuke(){SELECTORS.forEach(s=>{try{document.querySelectorAll(s).forEach(el=>{if(el&&el.offsetHeight>0&&el.offsetWidth>0){el.style.display='none';el.style.visibility='hidden';}});}catch{}});}
+  nuke();
+  const obs=new MutationObserver(nuke);
+  obs.observe(document.body||document.documentElement,{childList:true,subtree:true});
+  // Block ad network fetches
+  const _open=XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open=function(m,u,...a){const bad=['doubleclick','googlesyndication','adservice','amazon-adsystem','adsystem'];if(bad.some(x=>String(u).includes(x)))return;return _open.call(this,m,u,...a);};
+  console.log('[EP] Ad Blocker Pro active');
+})();`,
+
+  2: `/* Dark Reader */
+(function(){
+  if(document.getElementById('ep-dark-reader'))return;
+  const s=document.createElement('style');
+  s.id='ep-dark-reader';
+  s.textContent=\`
+    html{filter:invert(1) hue-rotate(180deg) !important; background:#111 !important;}
+    img,video,canvas,svg,iframe{filter:invert(1) hue-rotate(180deg) !important;}
+    [style*="background-image"]{filter:invert(1) hue-rotate(180deg) !important;}
+  \`;
+  (document.head||document.documentElement).appendChild(s);
+  console.log('[EP] Dark Reader active');
+})();`,
+
+  3: `/* Proxy Switcher — info banner */
+(function(){
+  if(document.getElementById('ep-proxy-info'))return;
+  const d=document.createElement('div');
+  d.id='ep-proxy-info';
+  d.style.cssText='position:fixed;bottom:8px;left:8px;z-index:2147483647;background:rgba(0,0,0,0.75);color:#00e5ff;font-family:monospace;font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid rgba(0,229,255,0.3);pointer-events:none;';
+  d.textContent='🔀 Proxy: '+location.hostname;
+  document.body.appendChild(d);
+  console.log('[EP] Proxy Switcher active');
+})();`,
+
+  4: `/* Password Manager — autofill hint */
+(function(){
+  document.querySelectorAll('input[type=password]').forEach(i=>{
+    i.style.outline='2px solid #00e5ff';
+    i.setAttribute('title','[EP] Password Manager active');
+  });
+  console.log('[EP] Password Manager active');
+})();`,
+
+  5: `/* Video Downloader — adds download button next to videos */
+(function(){
+  document.querySelectorAll('video').forEach((v,i)=>{
+    if(v.src&&!document.getElementById('ep-vdl-'+i)){
+      const btn=document.createElement('a');
+      btn.id='ep-vdl-'+i;
+      btn.href=v.src; btn.download='video.mp4';
+      btn.style.cssText='position:absolute;top:8px;right:8px;z-index:99999;background:#00e5ff;color:#000;font-size:11px;font-weight:bold;padding:4px 10px;border-radius:6px;text-decoration:none;cursor:pointer;';
+      btn.textContent='⬇ Save';
+      v.style.position='relative';
+      v.parentNode.style.position='relative';
+      v.parentNode.insertBefore(btn,v.nextSibling);
+    }
+  });
+  console.log('[EP] Video Downloader active');
+})();`,
+
+  6: `/* Screenshot Tool — Ctrl+Shift+S to capture */
+(function(){
+  if(window._epScreenshot)return;
+  window._epScreenshot=true;
+  document.addEventListener('keydown',e=>{
+    if(e.ctrlKey&&e.shiftKey&&e.key==='S'){
+      e.preventDefault();
+      import('https://html2canvas.hertzen.com/dist/html2canvas.min.js').catch(()=>{
+        // fallback: open print dialog
+        window.print();
+      });
+      showEpToast&&showEpToast('📸 Use Ctrl+P to save as PDF/image');
+    }
+  });
+  console.log('[EP] Screenshot Tool active (Ctrl+Shift+S)');
+})();`
+};
+
+// Inject all enabled extensions into a document
+function injectExtensionsIntoDoc(doc) {
+  if (!doc || !doc.body) return;
+  extensions.forEach(ext => {
+    if (!ext.enabled) return;
+    const scriptId = 'ep-ext-' + ext.id;
+    if (doc.getElementById(scriptId)) return; // already injected
+    const tag = doc.createElement('script');
+    tag.id = scriptId;
+    // Determine the code to run
+    let code = null;
+    if (BUILTIN_SCRIPTS[ext.id]) {
+      code = BUILTIN_SCRIPTS[ext.id];
+    } else if (ext.source === 'file' && ext.blobUrl) {
+      // For uploaded .js files, fetch the blob and inject synchronously
+      fetch(ext.blobUrl).then(r=>r.text()).then(text=>{
+        if (doc.getElementById(scriptId)) return;
+        const t=doc.createElement('script'); t.id=scriptId; t.textContent=text;
+        try{(doc.head||doc.body).appendChild(t); logExtInjected(ext.name);}catch{}
+      }).catch(()=>{});
+      return;
+    } else if (ext.source === 'url' && ext.url && /\.js(\?|$)/i.test(ext.url)) {
+      // Remote .js URL — inject as external script src
+      tag.src = ext.url;
+      tag.crossOrigin = 'anonymous';
+      try { (doc.head||doc.body).appendChild(tag); logExtInjected(ext.name); } catch {}
+      return;
+    } else if (ext.source === 'cws') {
+      // Inject real content scripts extracted from the CRX
+      if (ext.contentScripts && ext.contentScripts.length > 0) {
+        const pageUrl = doc.location ? doc.location.href : (doc.defaultView ? doc.defaultView.location.href : '');
+        ext.contentScripts.forEach((cs, csIdx) => {
+          // Check URL match patterns
+          const matches = urlMatchesPatterns(pageUrl, cs.matches || []);
+          if (!matches) return;
+          // Inject CSS
+          (cs.cssTexts || []).forEach((cssText, ci) => {
+            const cssId = `ep-ext-css-${ext.id}-${csIdx}-${ci}`;
+            if (doc.getElementById(cssId)) return;
+            const styleTag = doc.createElement('style');
+            styleTag.id = cssId;
+            styleTag.textContent = cssText;
+            (doc.head || doc.body).appendChild(styleTag);
+          });
+          // Inject JS content scripts
+          (cs.jsTexts || []).forEach((jsText, ji) => {
+            const jsId = `ep-ext-js-${ext.id}-${csIdx}-${ji}`;
+            if (doc.getElementById(jsId)) return;
+            const s = doc.createElement('script');
+            s.id = jsId;
+            s.textContent = jsText;
+            (doc.head || doc.body).appendChild(s);
+            logExtInjected(ext.name + ' (content script ' + ji + ')');
+          });
+        });
+        return; // handled above, skip generic code path
+      } else if (ext.crxStatus === 'loading') {
+        // Still fetching — skip silently, will inject on next page load
+        return;
+      } else if (ext.crxStatus === 'failed') {
+        // Fetch failed — show a small notice
+        code = `(function(){
+          if(document.getElementById('ep-cws-fail-${ext.id}'))return;
+          const d=document.createElement('div');
+          d.id='ep-cws-fail-${ext.id}';
+          d.style.cssText='position:fixed;bottom:8px;right:8px;z-index:2147483647;background:rgba(220,50,50,0.85);color:#fff;font-family:sans-serif;font-size:11px;padding:4px 10px;border-radius:6px;pointer-events:none;';
+          d.textContent='\u26a0\ufe0f ${ext.name.replace(/'/g,"\\'")} – CRX fetch failed (CORS). Upload .crx manually.';
+          document.body.appendChild(d);
+          setTimeout(()=>d.remove(),5000);
+        })();`;
+      } else {
+        // No content scripts found in manifest (e.g. background-only extension)
+        code = `(function(){
+          if(document.getElementById('ep-cws-notice-${ext.id}'))return;
+          const d=document.createElement('div');
+          d.id='ep-cws-notice-${ext.id}';
+          d.style.cssText='position:fixed;top:8px;right:8px;z-index:2147483647;background:rgba(66,133,244,0.88);color:#fff;font-family:sans-serif;font-size:12px;padding:6px 14px;border-radius:8px;pointer-events:none;';
+          d.textContent='\U0001f9e9 ${ext.name.replace(/'/g,"\\'")} active (no content scripts)';
+          document.body.appendChild(d);
+          setTimeout(()=>d.remove(),3500);
+        })();`;
+      }
+    } else {
+      // Generic: inject a banner noting the extension is active
+      code = `(function(){
+        if(document.getElementById('ep-ext-banner-${ext.id}'))return;
+        const d=document.createElement('div');
+        d.id='ep-ext-banner-${ext.id}';
+        d.style.cssText='position:fixed;bottom:${8+ext.id*32}px;left:8px;z-index:2147483647;background:rgba(0,0,0,0.7);color:#0f0;font-family:monospace;font-size:11px;padding:3px 10px;border-radius:6px;pointer-events:none;';
+        d.textContent='${(ext.icon||'🧩').replace(/'/g,"\\'")} ${ext.name.replace(/'/g,"\\'")} active';
+        document.body.appendChild(d);
+        setTimeout(()=>d.remove(),3500);
+      })();`;
+    }
+    if (code) {
+      tag.textContent = code;
+      try { (doc.head||doc.body).appendChild(tag); logExtInjected(ext.name); } catch {}
+    }
+  });
+}
+
+function logExtInjected(name) {
+  console.log(`[EP] Extension injected: ${name}`);
+}
+
+// Run injection whenever the web iframe finishes loading
+function injectIntoWebIframe() {
+  try {
+    const doc = webIframe.contentDocument;
+    if (doc && doc.readyState !== 'loading') {
+      injectExtensionsIntoDoc(doc);
+    }
+  } catch(e) {
+    // Cross-origin — can't inject (e.g. if proxy isn't routing same-origin)
+  }
 }
 
 function toggleExt(id){
@@ -1471,7 +2509,13 @@ function toggleExt(id){
   saveExtensions();
   const t=document.getElementById(`ext-toggle-${id}`);
   if(t)t.classList.toggle('on',ext.enabled);
-  showToast(`${ext.name} ${ext.enabled?'enabled':'disabled'}`);
+  if(ext.enabled){
+    // Inject immediately into currently open page
+    injectIntoWebIframe();
+    showToast(`${ext.icon||'🧩'} ${ext.name} enabled — injected into page`);
+  } else {
+    showToast(`${ext.icon||'🧩'} ${ext.name} disabled — reload page to remove`);
+  }
 }
 function removeExt(id){
   const ext=extensions.find(e=>e.id===id);
@@ -1492,6 +2536,7 @@ function openPanel(name){
   if(name==='bookmarks')renderBookmarksPanel();
   if(name==='downloads')renderDownloadsPanel();
   if(name==='extensions')renderExtensionsPanel();
+  if(name==='themes')renderThemesPanel();
   panel.classList.add('open');
   document.getElementById('panel-scrim').classList.add('show');
 }
@@ -1503,8 +2548,34 @@ function closePanel(name){
 }
 const _ps=document.getElementById('panel-scrim');if(_ps)_ps.addEventListener('click',()=>{if(activePanel)closePanel(activePanel);});
 const _bdl=document.getElementById('btn-downloads');if(_bdl)_bdl.addEventListener('click',()=>openPanel('downloads'));
-const _bext=document.getElementById('btn-extensions');if(_bext)_bext.addEventListener('click',()=>openPanel('extensions'));
-const _bbmm=document.getElementById('btn-bm-mgr');if(_bbmm)_bbmm.addEventListener('click',()=>openPanel('bookmarks'));
+
+// ═══════════════════════════════════════════
+//  MORE DROPDOWN MENU
+// ═══════════════════════════════════════════
+(function(){
+  const moreBtn=document.getElementById('btn-more');
+  const moreDrop=document.getElementById('more-dropdown');
+  if(!moreBtn||!moreDrop)return;
+
+  function toggleMore(e){e.stopPropagation();moreDrop.style.display=moreDrop.style.display==='none'?'block':'none';}
+  function hideMore(){moreDrop.style.display='none';}
+  moreBtn.addEventListener('click',toggleMore);
+  document.addEventListener('click',e=>{if(!moreBtn.contains(e.target))hideMore();});
+
+  document.getElementById('more-bm-bar')?.addEventListener('click',()=>{
+    hideMore();
+    bmBarVisible=!bmBarVisible;
+    localStorage.setItem('ep_bmbar',bmBarVisible?'1':'0');
+    applyBmBar();
+    showToast(bmBarVisible?'Bookmarks bar shown':'Bookmarks bar hidden');
+  });
+  document.getElementById('more-split')?.addEventListener('click',()=>{ hideMore(); document.getElementById('btn-split')?.click(); });
+  document.getElementById('more-history')?.addEventListener('click',()=>{ hideMore(); openPanel('history'); });
+  document.getElementById('more-extensions')?.addEventListener('click',()=>{ hideMore(); openPanel('extensions'); });
+  document.getElementById('more-bm-mgr')?.addEventListener('click',()=>{ hideMore(); openPanel('bookmarks'); });
+  document.getElementById('more-themes')?.addEventListener('click',()=>{ hideMore(); openPanel('themes'); });
+  document.getElementById('more-help')?.addEventListener('click',()=>{ hideMore(); openShortcutsOverlay(); });
+})();
 
 // ═══════════════════════════════════════════
 //  BOOKMARKS BAR TOGGLE
@@ -1515,12 +2586,6 @@ function applyBmBar(){
   if(bar)bar.classList.toggle('hidden-bar',!bmBarVisible);
 }
 applyBmBar();
-const _bbmb=document.getElementById('btn-bm-bar');if(_bbmb)_bbmb.addEventListener('click',()=>{
-  bmBarVisible=!bmBarVisible;
-  localStorage.setItem('ep_bmbar',bmBarVisible?'1':'0');
-  applyBmBar();
-  showToast(bmBarVisible?'Bookmarks bar shown':'Bookmarks bar hidden');
-});
 
 // Bookmark current page button
 const _bbm=document.getElementById('btn-bookmark');if(_bbm)_bbm.addEventListener('click',()=>{
@@ -1561,6 +2626,12 @@ function loadMims(){
   try{const c=JSON.parse(el.textContent);const blob=new Blob([c],{type:'text/html'});mimsIframe.src=URL.createObjectURL(blob);}catch(e){console.warn('MIMS load error:',e);}
 }
 
+function goTo(url) {
+  const proxied = '/proxy?url=' + encodeURIComponent(url);
+  const frame = document.getElementById('web-iframe');
+  if (frame) frame.src = proxied;
+}
+
 function openUrl(raw,addToHistory=true){
   let url=(raw||'').trim();if(!url)return;
   let full;
@@ -1576,11 +2647,12 @@ function openUrl(raw,addToHistory=true){
   if(full==='ep://home'){state.panel='home';showPanel('home');}
   else if(full==='mims://portal'){state.panel='mims';showPanel('mims');loadMims();}
   else{
-    state.panel='web';showPanel('web');webIframe.src=full;
+    state.panel='web';showPanel('web');
+    goTo(full);
     // Loading indicator on active tab
     const activeTabEl=tabBarEl?.querySelector(`.tab[data-id="${activeTabId}"]`);
     if(activeTabEl)activeTabEl.classList.add('loading');
-    webIframe.onload=()=>{
+    if(webIframe) webIframe.onload=()=>{
       const el=tabBarEl?.querySelector(`.tab[data-id="${activeTabId}"]`);
       if(el)el.classList.remove('loading');
       // Try to update tab title from iframe
@@ -1588,6 +2660,8 @@ function openUrl(raw,addToHistory=true){
         const iTitle=webIframe.contentDocument?.title;
         if(iTitle){const tab=tabs.find(t=>t.id===activeTabId);if(tab&&!tab.fixed){tab.title=iTitle.slice(0,28);saveTabs();renderTabs();}}
       }catch{}
+      // Inject enabled extensions into the newly loaded page
+      injectIntoWebIframe();
     };
   }
   updateAddressBar(full);updateNavBtns();renderTabs();hideSuggestions();
@@ -1822,7 +2896,7 @@ function switchTab(id){
   tabs.forEach(t=>t.active=t.id===id); activeTabId=id; saveTabs();
   if(!tabState[id])tabState[id]={history:[id===MIMS_ID?'mims://portal':'ep://home'],histIdx:0,panel:id===MIMS_ID?'mims':'home',url:'New Tab'};
   const s=tabState[id]; showPanel(s.panel);
-  if(s.panel==='web')webIframe.src=s.history[s.histIdx];
+  if(s.panel==='web'){const _restoreUrl=s.history[s.histIdx];goTo(_restoreUrl);}
   if(s.panel==='mims')loadMims();
   updateAddressBar(s.url); updateNavBtns(); renderTabs();
 }
@@ -1902,7 +2976,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap')&&!e.t
 //  NAV BUTTONS
 // ═══════════════════════════════════════════
 const _reload=document.getElementById('btn-reload');
-if(_reload)_reload.addEventListener('click',()=>{_reload.style.transform='rotate(360deg)';_reload.style.transition='transform 0.5s ease';setTimeout(()=>{_reload.style.transform='';_reload.style.transition='';},500);const s=tabState[activeTabId];if(!s)return;if(s.panel==='web')try{webIframe.contentWindow.location.reload();}catch{webIframe.src=s.history[s.histIdx];}if(s.panel==='mims')try{mimsIframe.contentWindow.location.reload();}catch{}});
+if(_reload)_reload.addEventListener('click',()=>{_reload.style.transform='rotate(360deg)';_reload.style.transition='transform 0.5s ease';setTimeout(()=>{_reload.style.transform='';_reload.style.transition='';},500);const s=tabState[activeTabId];if(!s)return;if(s.panel==='web')try{webIframe.contentWindow.location.reload();}catch{const _ru=s.history[s.histIdx];goTo(_ru);}if(s.panel==='mims')try{mimsIframe.contentWindow.location.reload();}catch{}});
 const _back=document.getElementById('btn-back');
 if(_back)_back.addEventListener('click',()=>{const s=tabState[activeTabId];if(!s||s.histIdx<=0)return;s.histIdx--;openUrl(s.history[s.histIdx],false);});
 const _fwd=document.getElementById('btn-forward');
@@ -1997,7 +3071,8 @@ function loadSplitUrl(raw) {
   if (!url) return;
   if (url.includes('.') && !url.includes(' ') && !/^https?:\/\//i.test(url)) url = 'https://' + url;
   else if (!/^https?:\/\//i.test(url)) url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
-  splitIframe.src = url;
+  const proxied = '/proxy?url=' + encodeURIComponent(url);
+  splitIframe.src = proxied;
   splitInput.value = url;
   splitPlaceholder.style.display = 'none';
 }
@@ -2067,9 +3142,11 @@ function applySeasonTheme(){
   document.body.classList.toggle('spring-city', springEnabled);
   document.body.classList.toggle('sand-city', sandEnabled);
   document.body.classList.toggle('radioactive-city', radioactiveEnabled);
+  document.body.classList.toggle('thunder-city', thunderEnabled);
+  document.body.classList.toggle('grass-city', grassEnabled);
   const pt=document.getElementById('proxy-title');
   if(pt){
-    const anySeasonActive=summerEnabled||winterEnabled||fallEnabled||springEnabled||sandEnabled||radioactiveEnabled;
+    const anySeasonActive=summerEnabled||winterEnabled||fallEnabled||springEnabled||sandEnabled||radioactiveEnabled||thunderEnabled||grassEnabled;
     if(anySeasonActive){
       pt.style.fontStyle='italic';
       pt.style.fontFamily="'Pacifico','Orbitron',cursive";
@@ -2086,6 +3163,8 @@ function applySeasonTheme(){
   else if(summerEnabled)      document.title='🌅 Endless Proxy';
   else if(sandEnabled)        document.title='⚡ Endless Proxy';
   else if(radioactiveEnabled) document.title='☢️ Endless Proxy';
+  else if(thunderEnabled)     document.title='⛈️ Endless Proxy';
+  else if(grassEnabled)       document.title='🌿 Endless Proxy';
   else                        document.title='Endless Proxy';
 }
 // Keep old name as alias so nothing breaks
@@ -2151,9 +3230,6 @@ function renderHistoryPanel() {
 }
 
 // Wire history button
-const _bhist = document.getElementById('btn-history');
-if (_bhist) _bhist.addEventListener('click', () => openPanel('history'));
-
 // Patch openPanel to support history
 // NOTE: must use variable assignment (not function declaration) so the
 // hoisted first openPanel is correctly captured in _origOpenPanel.
@@ -2384,3 +3460,4 @@ document.addEventListener('keydown',e=>{
     if(activePanel)closePanel(activePanel);
   }
 });
+
